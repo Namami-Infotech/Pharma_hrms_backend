@@ -6,6 +6,16 @@
 CREATE DATABASE IF NOT EXISTS `pharma_hrms` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `pharma_hrms`;
 
+-- 0. Tenent Table
+CREATE TABLE IF NOT EXISTS `Tenent` (
+  `Tenent_ID` INT AUTO_INCREMENT PRIMARY KEY,
+  `Id` INT DEFAULT 1,
+  `Tenent_Name` VARCHAR(150) NOT NULL,
+  `Menu` TEXT DEFAULT NULL,
+  `IsActive` TINYINT DEFAULT 1,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 1. Employees Table
 CREATE TABLE IF NOT EXISTS `Employees` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -80,11 +90,17 @@ CREATE TABLE IF NOT EXISTS `EmployeeOffice` (
 CREATE TABLE IF NOT EXISTS `EmployeeLeave` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `EmpId` VARCHAR(50) NOT NULL,
-  `LeaveType` VARCHAR(50) NOT NULL,
+  `LeaveType` VARCHAR(50) DEFAULT 'Annual',
   `TotalLeave` INT DEFAULT 0,
   `BalanceLeave` INT DEFAULT 0,
   `Tenent_Id` INT DEFAULT 1,
   `FinancialYear` VARCHAR(20) DEFAULT NULL,
+  `SL` DECIMAL(5,2) DEFAULT 0,
+  `EL` DECIMAL(5,2) DEFAULT 0,
+  `CompOff` DECIMAL(5,2) DEFAULT 0,
+  `BL` DECIMAL(5,2) DEFAULT 0,
+  `PL` DECIMAL(5,2) DEFAULT 0,
+  `CL` DECIMAL(5,2) DEFAULT 0,
   INDEX (`EmpId`),
   INDEX (`Tenent_Id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

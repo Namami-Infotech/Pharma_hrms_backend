@@ -1,4 +1,6 @@
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
 const db = require('./db');
 
 /**
@@ -6,6 +8,7 @@ const db = require('./db');
  */
 const DEFAULT_TENANT = {
   Tenent_ID: 1,
+  Id: 1,
   Tenent_Name: 'SAFEGUARD Main',
   Menu: '1,2,3,4,5,6,7,8,9,10',
   IsActive: 1
@@ -133,22 +136,80 @@ const DEFAULT_HOLIDAYS = [
 ];
 
 /**
+ * Ensures all database tables are created from schema.sql before seeding
+ */
+async function ensureTablesExist() {
+  const schemaPath = path.join(__dirname, '../../scripts/schema.sql');
+  if (!fs.existsSync(schemaPath)) {
+    console.warn('[Database Seeder] scripts/schema.sql not found at:', schemaPath);
+    return;
+  }
+
+  try {
+    const sql = fs.readFileSync(schemaPath, 'utf-8');
+    const statements = sql
+      .split(/;\s*[\r\n]+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && /CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS/i.test(s));
+
+    console.log(`[Database Seeder] Checking/creating ${statements.length} schema tables...`);
+
+    for (const stmt of statements) {
+      try {
+        await db.query(stmt);
+      } catch (tableErr) {
+        // Table might already exist or minor dialect difference, continue
+        console.warn(`[Database Seeder] Table creation note: ${tableErr.message}`);
+      }
+    }
+    console.log('[Database Seeder] ✓ Schema tables verified.');
+  } catch (err) {
+    console.error('[Database Seeder] Error during table creation:', err.message);
+  }
+}
+
+/**
+ * Helper to resolve case-insensitive table name (for Linux vs Windows compatibility)
+ */
+async function getTableName(candidates) {
+  for (const name of candidates) {
+    try {
+      await db.query(`SELECT 1 FROM \`${name}\` LIMIT 1`);
+      return `\`${name}\``;
+    } catch (e) {
+      // Try next candidate
+    }
+  }
+  return `\`${candidates[0]}\``;
+}
+
+/**
  * Main seeding function. Idempotent: checks for existence before inserting/updating.
  */
 async function seedDatabase() {
-  console.log('\n[Database Seeder] Checking and seeding default records...');
+  console.log('\n[Database Seeder] Initializing database check & seed process...');
 
   try {
-    // 1. Seed Tenant
+    // Step 1: Ensure all tables exist in the database
+    await ensureTablesExist();
+
+    // Resolve case-insensitive table names
+    const tenentTable = await getTableName(['Tenent', 'tenent']);
+    const employeeOfficeTable = await getTableName(['EmployeeOffice', 'employeeoffice']);
+    const employeesTable = await getTableName(['Employees', 'employees']);
+    const employeeLeaveTable = await getTableName(['EmployeeLeave', 'employeeleave']);
+    const holidaysTable = await getTableName(['Holidays', 'holidays']);
+
+    // Step 2: Seed Tenant
     try {
       const [existingTenants] = await db.query(
-        'SELECT Tenent_ID FROM tenent WHERE Tenent_ID = ? LIMIT 1',
+        `SELECT Tenent_ID FROM ${tenentTable} WHERE Tenent_ID = ? LIMIT 1`,
         [DEFAULT_TENANT.Tenent_ID]
       );
       if (!existingTenants || existingTenants.length === 0) {
         await db.execute(
-          'INSERT INTO tenent (Tenent_ID, Tenent_Name, Menu, IsActive) VALUES (?, ?, ?, ?)',
-          [DEFAULT_TENANT.Tenent_ID, DEFAULT_TENANT.Tenent_Name, DEFAULT_TENANT.Menu, DEFAULT_TENANT.IsActive]
+          `INSERT INTO ${tenentTable} (Tenent_ID, Id, Tenent_Name, Menu, IsActive) VALUES (?, ?, ?, ?, ?)`,
+          [DEFAULT_TENANT.Tenent_ID, DEFAULT_TENANT.Id, DEFAULT_TENANT.Tenent_Name, DEFAULT_TENANT.Menu, DEFAULT_TENANT.IsActive]
         );
         console.log(`[Database Seeder] ✓ Tenant '${DEFAULT_TENANT.Tenent_Name}' created.`);
       }
@@ -156,16 +217,16 @@ async function seedDatabase() {
       console.warn('[Database Seeder] Tenant table check/seed warning:', err.message);
     }
 
-    // 2. Seed Offices
+    // Step 3: Seed Offices
     try {
       for (const office of DEFAULT_OFFICES) {
         const [existing] = await db.query(
-          'SELECT id FROM employeeoffice WHERE id = ? LIMIT 1',
+          `SELECT id FROM ${employeeOfficeTable} WHERE id = ? LIMIT 1`,
           [office.id]
         );
         if (!existing || existing.length === 0) {
           await db.execute(
-            'INSERT INTO employeeoffice (id, OfficeName, OfficeAddress, LatLong, Distance, Tenent_Id, IsActive) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            `INSERT INTO ${employeeOfficeTable} (id, OfficeName, OfficeAddress, LatLong, Distance, Tenent_Id, IsActive) VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [office.id, office.OfficeName, office.OfficeAddress, office.LatLong, office.Distance, office.Tenent_Id, office.IsActive]
           );
           console.log(`[Database Seeder] ✓ Office '${office.OfficeName}' created.`);
@@ -175,19 +236,19 @@ async function seedDatabase() {
       console.warn('[Database Seeder] Office table check/seed warning:', err.message);
     }
 
-    // 3. Seed Users / Employees
+    // Step 4: Seed Users / Employees
     for (const user of SEED_USERS) {
       const hashedPassword = bcrypt.hashSync(user.PlainPassword, 10);
       try {
         const [existing] = await db.query(
-          'SELECT EmpId FROM employees WHERE EmpId = ? LIMIT 1',
+          `SELECT EmpId FROM ${employeesTable} WHERE EmpId = ? LIMIT 1`,
           [user.EmpId]
         );
 
         if (!existing || existing.length === 0) {
           // Insert new user
           await db.execute(
-            `INSERT INTO employees 
+            `INSERT INTO ${employeesTable} 
              (EmpId, Name, EmailId, Mobile, Password, Role, Designation, Department, OfficeId, RM, Shift, ResetTime, Tenent_Id, IsActive) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
@@ -211,7 +272,7 @@ async function seedDatabase() {
         } else {
           // Update credentials and essential fields so known passwords always work
           await db.execute(
-            `UPDATE employees 
+            `UPDATE ${employeesTable} 
              SET Password = ?, IsActive = 1, Role = ?, Name = ?, EmailId = ?, Mobile = ?, OfficeId = ?, Shift = ?, ResetTime = ?
              WHERE EmpId = ?`,
             [
@@ -229,15 +290,15 @@ async function seedDatabase() {
           console.log(`[Database Seeder] ✓ User '${user.Name}' (${user.EmpId}) verified & credentials updated.`);
         }
 
-        // 4. Ensure EmployeeLeave record exists
+        // Step 5: Ensure EmployeeLeave record exists
         try {
           const [existingLeave] = await db.query(
-            'SELECT id FROM employeeleave WHERE EmpId = ? LIMIT 1',
+            `SELECT id FROM ${employeeLeaveTable} WHERE EmpId = ? LIMIT 1`,
             [user.EmpId]
           );
           if (!existingLeave || existingLeave.length === 0) {
             await db.execute(
-              `INSERT INTO employeeleave 
+              `INSERT INTO ${employeeLeaveTable} 
                (EmpId, LeaveType, TotalLeave, BalanceLeave, Tenent_Id, SL, EL, CL) 
                VALUES (?, 'Annual', 39, 39, ?, 12, 15, 12)`,
               [user.EmpId, user.Tenent_Id]
@@ -252,13 +313,13 @@ async function seedDatabase() {
       }
     }
 
-    // 5. Seed sample holidays if empty
+    // Step 6: Seed sample holidays if empty
     try {
-      const [holidayCount] = await db.query('SELECT COUNT(*) as cnt FROM holidays WHERE Tenent_Id = 1');
+      const [holidayCount] = await db.query(`SELECT COUNT(*) as cnt FROM ${holidaysTable} WHERE Tenent_Id = 1`);
       if (holidayCount && holidayCount[0].cnt === 0) {
         for (const h of DEFAULT_HOLIDAYS) {
           await db.execute(
-            'INSERT INTO holidays (date, title, Tenent_Id) VALUES (?, ?, ?)',
+            `INSERT INTO ${holidaysTable} (date, title, Tenent_Id) VALUES (?, ?, ?)`,
             [h.date, h.title, h.Tenent_Id]
           );
         }
@@ -312,6 +373,7 @@ if (require.main === module) {
 
 module.exports = {
   seedDatabase,
+  ensureTablesExist,
   SEED_USERS,
   DEFAULT_OFFICES,
   DEFAULT_TENANT,
