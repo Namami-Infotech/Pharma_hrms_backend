@@ -1,0 +1,59 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Environment and sensitive credentials
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+
+# User uploads and runtime media
+uploads/*
+!uploads/.gitkeep
+assets/uploads/*
+!assets/.gitkeep
+
+# Logs and runtime data
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Coverage and test artifacts
+coverage/
+*.lcov
+.nyc_output/
+
+# IDE and editor files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.sublime-project
+*.sublime-workspace
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# Temporary files and caches
+.cache/
+tmp/
+temp/
