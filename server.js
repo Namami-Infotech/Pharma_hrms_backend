@@ -87,14 +87,23 @@ app.use((req, res, next) => {
 // Centralized error handler
 app.use(errorHandler);
 
+const { seedDatabase } = require('./src/config/seed');
+
 // Start server
 if (require.main === module) {
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     console.log('====================================================');
     console.log(` SAFEGUARD Backend running on http://localhost:${PORT}`);
     console.log(` Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(` Database: ${(process.env.DB_NAME || 'pharma_hrms').trim()}`);
     console.log('====================================================');
+
+    // Automatically seed/verify initial database values on startup
+    try {
+      await seedDatabase();
+    } catch (seedErr) {
+      console.error('[Startup] Error during database seeding:', seedErr);
+    }
   });
 }
 

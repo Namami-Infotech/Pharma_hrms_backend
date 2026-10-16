@@ -86,7 +86,7 @@ async function getMenuByTenent(tenentId) {
   if (!tenentId) return [];
   try {
     const [rows] = await db.query(
-      'SELECT Menu FROM Tenent WHERE Id = ? LIMIT 1',
+      'SELECT Menu FROM tenent WHERE Tenent_ID = ? LIMIT 1',
       [tenentId]
     );
     if (rows && rows.length > 0 && rows[0].Menu) {
