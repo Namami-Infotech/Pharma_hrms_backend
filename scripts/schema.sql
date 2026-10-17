@@ -716,3 +716,106 @@ CREATE TABLE IF NOT EXISTS `Activity_New` (
   INDEX (`Date`),
   INDEX (`Tenent_Id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 35. Assets Issue Table
+CREATE TABLE IF NOT EXISTS `assets_issue` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `emp_id` VARCHAR(50) NOT NULL,
+  `asset_id` INT NOT NULL,
+  `asset_name` VARCHAR(150) DEFAULT NULL,
+  `serial_number` VARCHAR(100) DEFAULT NULL,
+  `make_name` VARCHAR(100) DEFAULT NULL,
+  `model_name` VARCHAR(100) DEFAULT NULL,
+  `status` VARCHAR(50) DEFAULT 'Issued',
+  `remark` TEXT DEFAULT NULL,
+  `issue_date` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `return_date` DATETIME DEFAULT NULL,
+  `Tenent_Id` INT DEFAULT 1,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX (`emp_id`),
+  INDEX (`asset_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 36. Dealers Table
+CREATE TABLE IF NOT EXISTS `Dealers` (
+  `DealerID` INT AUTO_INCREMENT PRIMARY KEY,
+  `DealerName` VARCHAR(150) NOT NULL,
+  `Address` TEXT DEFAULT NULL,
+  `ContactInfo` VARCHAR(100) DEFAULT NULL,
+  `LatLong` VARCHAR(100) DEFAULT NULL,
+  `CompanyName` VARCHAR(150) DEFAULT NULL,
+  `MailId` VARCHAR(150) DEFAULT NULL,
+  `Remarks` TEXT DEFAULT NULL,
+  `AddedByEmpId` VARCHAR(50) DEFAULT NULL,
+  `IsActive` TINYINT DEFAULT 1,
+  `Tenent_Id` INT DEFAULT 1,
+  `CreateDate` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX (`DealerName`),
+  INDEX (`AddedByEmpId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 37. ExpenseDetails Table
+CREATE TABLE IF NOT EXISTS `ExpenseDetails` (
+  `detailId` INT AUTO_INCREMENT PRIMARY KEY,
+  `batchId` VARCHAR(100) NOT NULL,
+  `empId` VARCHAR(50) NOT NULL,
+  `expenseDate` DATE NOT NULL,
+  `expenseType` VARCHAR(100) NOT NULL,
+  `expenseAmount` DECIMAL(12, 2) NOT NULL,
+  `image` VARCHAR(255) DEFAULT NULL,
+  `Status` VARCHAR(50) DEFAULT 'Pending',
+  `Remarks` TEXT DEFAULT NULL,
+  `ApprovedBy` VARCHAR(50) DEFAULT NULL,
+  `Tenent_Id` INT DEFAULT 1,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX (`empId`),
+  INDEX (`batchId`),
+  INDEX (`Status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 38. TravelExpenses Table
+CREATE TABLE IF NOT EXISTS `TravelExpenses` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `batchId` VARCHAR(100) NOT NULL,
+  `empId` VARCHAR(50) NOT NULL,
+  `travelDate` DATE NOT NULL,
+  `travelFrom` VARCHAR(150) NOT NULL,
+  `travelTo` VARCHAR(150) NOT NULL,
+  `travelType` VARCHAR(100) NOT NULL,
+  `status` VARCHAR(50) DEFAULT 'Pending',
+  `remark` TEXT DEFAULT NULL,
+  `ApprovedBy` VARCHAR(50) DEFAULT NULL,
+  `Tenent_Id` INT DEFAULT 1,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX (`empId`),
+  INDEX (`batchId`),
+  INDEX (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 39. Visit Table
+CREATE TABLE IF NOT EXISTS `Visit` (
+  `VisitID` INT AUTO_INCREMENT PRIMARY KEY,
+  `EmpId` VARCHAR(50) NOT NULL,
+  `DealerID` INT DEFAULT NULL,
+  `DealerName` VARCHAR(150) DEFAULT NULL,
+  `VisitCount` VARCHAR(10) DEFAULT 'A',
+  `VisitLatLong` VARCHAR(100) DEFAULT NULL,
+  `VisitTime` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `Status` VARCHAR(50) DEFAULT 'Planned',
+  `Plan_Visit` DATETIME DEFAULT NULL,
+  `CompanyName` VARCHAR(150) DEFAULT NULL,
+  `MobileNo` VARCHAR(20) DEFAULT NULL,
+  `Mode` VARCHAR(50) DEFAULT NULL,
+  `Purpose` VARCHAR(255) DEFAULT NULL,
+  `Remarks` TEXT DEFAULT NULL,
+  `Attachment` VARCHAR(255) DEFAULT NULL,
+  `old_visit` INT DEFAULT NULL,
+  `LatLong` VARCHAR(100) DEFAULT NULL,
+  `Tenent_Id` INT DEFAULT 1,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX (`EmpId`),
+  INDEX (`DealerID`),
+  INDEX (`Plan_Visit`),
+  INDEX (`Status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

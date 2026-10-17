@@ -163,6 +163,14 @@ async function ensureTablesExist() {
       }
     }
     console.log('[Database Seeder] ✓ Schema tables verified.');
+
+    // Auto-migrate any missing columns for all 32 modules
+    try {
+      const { runAutoMigration } = require('../../scripts/migrate_all_tables');
+      await runAutoMigration();
+    } catch (migErr) {
+      console.warn('[Database Seeder] Column migration note:', migErr.message);
+    }
   } catch (err) {
     console.error('[Database Seeder] Error during table creation:', err.message);
   }
