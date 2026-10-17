@@ -8,19 +8,21 @@ const getSalary = async (req, res) => {
   try {
     let query = 'SELECT * FROM salary_structure_new';
     const params = [];
+    const empId = req.query.emp_id || req.query.empId || req.query.EmpId || null;
 
     if (empId) {
-      query += ' WHERE EmpId = ?';
+      query += ' WHERE empId = ?';
       params.push(empId);
     }
 
     const [rows] = await db.query(query, params);
 
-    if (rows && rows.length > 0) {
-      response.success = true;
-      response.data = rows;
-    } else {
+    response.success = true;
+    response.data = rows || [];
+    if (!rows || rows.length === 0) {
       response.message = 'No salary details found.';
+    } else {
+      response.message = 'Salary details fetched successfully.';
     }
 
     return res.json(response);

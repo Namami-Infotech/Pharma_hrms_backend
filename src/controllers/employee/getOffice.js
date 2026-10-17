@@ -4,7 +4,7 @@ const getOffice = async (req, res) => {
   const response = { success: false, message: '', data: [] };
 
   try {
-    const [rows] = await db.query('SELECT * FROM EmployeeOffice');
+    const [rows] = await db.query('SELECT *, id AS Id, id AS OfficeId FROM EmployeeOffice');
     if (rows && rows.length > 0) {
       response.success = true;
       response.data = rows;

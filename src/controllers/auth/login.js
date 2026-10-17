@@ -64,7 +64,10 @@ const login = async (req, res) => {
     const officeDetails = await getOfficeDetails(employee.EmpId);
 
     // Tenant menu
-    const menu = await getMenuByTenent(employee.Tenent_Id);
+    let menu = await getMenuByTenent(employee.Tenent_Id);
+    if (employee.Role === 'Admin' || employee.Role === 'admin') {
+      menu = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+    }
 
     response.success = true;
     response.message = 'Login successful';

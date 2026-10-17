@@ -13,10 +13,11 @@ const listEmployees = async (req, res) => {
     const query = `
       SELECT 
         e.*,
+        COALESCE(e.IsActive, 1) as IsActive,
         eo.OfficeName
       FROM Employees e
       LEFT JOIN EmployeeOffice eo 
-        ON e.OfficeId = eo.Id
+        ON (e.OfficeId = eo.id OR e.OfficeId = eo.OfficeId)
       WHERE e.Tenent_Id = ?
       ORDER BY e.EmpId ASC
     `;

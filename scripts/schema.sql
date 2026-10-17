@@ -361,6 +361,102 @@ CREATE TABLE IF NOT EXISTS `Salary` (
   INDEX (`Month`, `Year`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 16a. Salary Structure New Table
+CREATE TABLE IF NOT EXISTS `salary_structure_new` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `empId` VARCHAR(50) NOT NULL,
+  `emp_name` VARCHAR(150) DEFAULT NULL,
+  `designation` VARCHAR(100) DEFAULT NULL,
+  `department` VARCHAR(100) DEFAULT NULL,
+  `grade` VARCHAR(50) DEFAULT NULL,
+  `date_of_joining` VARCHAR(50) DEFAULT NULL,
+  `basic_salary` DECIMAL(10, 2) DEFAULT 0,
+  `basic_salary_per_annum` DECIMAL(10, 2) DEFAULT 0,
+  `hra` DECIMAL(10, 2) DEFAULT 0,
+  `hra_per_annum` DECIMAL(10, 2) DEFAULT 0,
+  `conveyance` DECIMAL(10, 2) DEFAULT 0,
+  `conveyance_per_annum` DECIMAL(10, 2) DEFAULT 0,
+  `special_allowance` DECIMAL(10, 2) DEFAULT 0,
+  `special_allowance_per_annum` DECIMAL(10, 2) DEFAULT 0,
+  `gross_salary` DECIMAL(10, 2) DEFAULT 0,
+  `gross_salary_per_annum` DECIMAL(10, 2) DEFAULT 0,
+  `epf` DECIMAL(10, 2) DEFAULT 0,
+  `epf_per_annum` DECIMAL(10, 2) DEFAULT 0,
+  `esi` DECIMAL(10, 2) DEFAULT 0,
+  `esi_per_annum` DECIMAL(10, 2) DEFAULT 0,
+  `total_benefits` DECIMAL(10, 2) DEFAULT 0,
+  `total_benefits_per_annum` DECIMAL(10, 2) DEFAULT 0,
+  `total_cost_of_company` DECIMAL(10, 2) DEFAULT 0,
+  `net_take_home` DECIMAL(10, 2) DEFAULT 0,
+  `Tenent_Id` INT DEFAULT 1,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_salary_empId` (`empId`),
+  INDEX (`empId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 16b. Salary Records Table
+CREATE TABLE IF NOT EXISTS `salary_records` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `EmpId` VARCHAR(50) NOT NULL,
+  `Name` VARCHAR(150) DEFAULT NULL,
+  `Designation` VARCHAR(100) DEFAULT NULL,
+  `BasicSalary` DECIMAL(10, 2) DEFAULT 0,
+  `Month` INT NOT NULL,
+  `Year` INT NOT NULL,
+  `TotalDaysInMonth` INT DEFAULT 30,
+  `Holidays` INT DEFAULT 0,
+  `WeekOffs` INT DEFAULT 0,
+  `PresentDays` INT DEFAULT 0,
+  `LeaveDays` INT DEFAULT 0,
+  `ActualWorkingDays` INT DEFAULT 0,
+  `Salary` DECIMAL(10, 2) DEFAULT 0,
+  `Tenent_Id` INT DEFAULT 1,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX (`EmpId`),
+  INDEX (`Month`, `Year`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 16c. Salary Records New Table
+CREATE TABLE IF NOT EXISTS `salary_records_new` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `empId` VARCHAR(50) NOT NULL,
+  `emp_name` VARCHAR(150) DEFAULT NULL,
+  `designation` VARCHAR(100) DEFAULT NULL,
+  `department` VARCHAR(100) DEFAULT NULL,
+  `month` VARCHAR(20) NOT NULL,
+  `year` INT NOT NULL,
+  `total_days` INT DEFAULT 30,
+  `present_days` INT DEFAULT 0,
+  `leave_days` INT DEFAULT 0,
+  `week_offs` INT DEFAULT 0,
+  `holidays` INT DEFAULT 0,
+  `working_days` INT DEFAULT 0,
+  `basic_salary` DECIMAL(10, 2) DEFAULT 0,
+  `hra` DECIMAL(10, 2) DEFAULT 0,
+  `conveyance` DECIMAL(10, 2) DEFAULT 0,
+  `special_allowance` DECIMAL(10, 2) DEFAULT 0,
+  `gross_salary` DECIMAL(10, 2) DEFAULT 0,
+  `epf` DECIMAL(10, 2) DEFAULT 0,
+  `esi` DECIMAL(10, 2) DEFAULT 0,
+  `total_deductions` DECIMAL(10, 2) DEFAULT 0,
+  `net_salary` DECIMAL(10, 2) DEFAULT 0,
+  `Tenent_Id` INT DEFAULT 1,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX (`empId`),
+  INDEX (`month`, `year`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 16d. Salary Structure Table
+CREATE TABLE IF NOT EXISTS `salary_structure` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `EmpId` VARCHAR(50) NOT NULL,
+  `Basic_Salary` DECIMAL(10, 2) DEFAULT 0,
+  `Tenent_Id` INT DEFAULT 1,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_ss_EmpId` (`EmpId`),
+  INDEX (`EmpId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 17. Tasks Table
 CREATE TABLE IF NOT EXISTS `Tasks` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
