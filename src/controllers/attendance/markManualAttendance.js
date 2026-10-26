@@ -22,13 +22,37 @@ const markManualAttendance = async (req, res) => {
     imageUrl = saveBase64Image(base64Image, 'attendance');
   }
 
-  const [userLat, userLon] = GeoLocation.split(',').map(Number);
-  const actualDistance = parseFloat(
-    calculateDistance(userLat, userLon, OFFICE_LAT, OFFICE_LON).toFixed(2)
-  );
+  let userLat = null;
+  let userLon = null;
+  let actualDistance = 0;
+  if (GeoLocation && GeoLocation.includes(',')) {
+    const coords = GeoLocation.split(',').map((n) => parseFloat(n.trim()));
+    userLat = isNaN(coords[0]) ? null : coords[0];
+    userLon = isNaN(coords[1]) ? null : coords[1];
+    if (userLat !== null && userLon !== null && (userLat !== 0 || userLon !== 0)) {
+      actualDistance = parseFloat(
+        calculateDistance(userLat, userLon, OFFICE_LAT, OFFICE_LON).toFixed(2)
+      );
+    }
+  }
 
   Event = Event.toLowerCase().trim().startsWith('in') ? 'In' : 'Out';
-  const currentDate = new Date(MobileDateTime).toISOString().slice(0, 10);
+
+  let currentDate = '';
+  let currentTime = '';
+  if (MobileDateTime && MobileDateTime.includes(' ')) {
+    const parts = MobileDateTime.trim().split(' ');
+    currentDate = parts[0];
+    currentTime = parts[1];
+  } else if (MobileDateTime && MobileDateTime.includes('T')) {
+    const d = new Date(MobileDateTime);
+    currentDate = !isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+    currentTime = !isNaN(d.getTime()) ? d.toTimeString().slice(0, 8) : '00:00:00';
+  } else {
+    const now = new Date();
+    currentDate = now.toISOString().slice(0, 10);
+    currentTime = now.toTimeString().slice(0, 8);
+  }
 
   const conn = await db.getConnection();
   try {
@@ -41,28 +65,34 @@ const markManualAttendance = async (req, res) => {
 
     const lastEvent = lastRows.length > 0 ? lastRows[0].Event : null;
 
-    if (Event === 'In' && lastEvent === 'In') {
-      conn.release();
-      return res.json({ success: false, message: 'Already checked in' });
-    }
+    if (app_ver !== 'Manual') {
+      if (Event === 'In' && lastEvent === 'In') {
+        conn.release();
+        return res.json({ success: false, message: 'Already checked in' });
+      }
 
-    if (Event === 'Out' && !lastEvent) {
-      conn.release();
-      return res.json({ success: false, message: 'Check-in required' });
+      if (Event === 'Out' && !lastEvent) {
+        conn.release();
+        return res.json({ success: false, message: 'Check-in required' });
+      }
     }
 
     await conn.beginTransaction();
 
     await conn.execute(
       `INSERT INTO Activity 
-       (EmpId, LocationId, Event, GeoLocation, Distance, MobileDateTime, ServerDateTime, Image, app_ver) 
-       VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?)`,
+       (EmpId, Activity, LocationId, Event, GeoLocation, Latitude, Longitude, Distance, Date, Time, MobileDateTime, ServerDateTime, Image, app_ver) 
+       VALUES (?, 'Attendance', ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)`,
       [
         EmpId,
         LocationId,
         Event,
         GeoLocation,
+        userLat,
+        userLon,
         actualDistance,
+        currentDate,
+        currentTime,
         MobileDateTime,
         imageUrl,
         app_ver
@@ -70,27 +100,58 @@ const markManualAttendance = async (req, res) => {
     );
 
     const [attRows] = await conn.query(
-      'SELECT InTime, OutTime FROM Attendance WHERE EmpId = ? AND DateTime = ? LIMIT 1',
-      [EmpId, currentDate]
+      'SELECT id, Date, InTime, OutTime FROM Attendance WHERE EmpId = ? AND (Date = ? OR DateTime = ?) ORDER BY id DESC LIMIT 1',
+      [EmpId, currentDate, currentDate]
     );
 
     const attendance = attRows.length > 0 ? attRows[0] : null;
 
     if (!attendance && Event === 'In') {
       await conn.execute(
-        `INSERT INTO Attendance (EmpId, DateTime, InTime, InLatLong, InEvent) 
-         VALUES (?, ?, ?, ?, 'In')`,
-        [EmpId, currentDate, MobileDateTime, GeoLocation]
+        `INSERT INTO Attendance (EmpId, Date, DateTime, InTime, InLatLong, InLatitude, InLongitude, InEvent, Status) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'In', 'Present')`,
+        [EmpId, currentDate, currentDate, MobileDateTime, GeoLocation, userLat, userLon]
+      );
+    } else if (attendance && Event === 'In') {
+      await conn.execute(
+        `UPDATE Attendance 
+         SET InTime = ?, InLatLong = ?, InLatitude = ?, InLongitude = ?, InEvent = 'In', Status = 'Present' 
+         WHERE id = ?`,
+        [MobileDateTime, GeoLocation, userLat, userLon, attendance.id]
       );
     }
 
-    if (attendance && !attendance.OutTime && Event === 'Out') {
-      await conn.execute(
-        `UPDATE Attendance 
-         SET OutTime = ?, OutLatLong = ?, OutEvent = 'Out' 
-         WHERE EmpId = ? AND DateTime = ?`,
-        [MobileDateTime, GeoLocation, EmpId, currentDate]
-      );
+    if (Event === 'Out') {
+      let targetAtt = attendance;
+      if (!targetAtt) {
+        const [prevRows] = await conn.query(
+          'SELECT id, Date, InTime, OutTime FROM Attendance WHERE EmpId = ? AND (OutTime IS NULL OR OutTime = "") ORDER BY id DESC LIMIT 1',
+          [EmpId]
+        );
+        if (prevRows.length > 0) {
+          targetAtt = prevRows[0];
+        }
+      }
+
+      if (targetAtt) {
+        let totalHours = null;
+        if (targetAtt.InTime) {
+          totalHours = calculateWorkingHours(targetAtt.InTime, MobileDateTime);
+        }
+
+        await conn.execute(
+          `UPDATE Attendance 
+           SET OutTime = ?, OutLatLong = ?, OutLatitude = ?, OutLongitude = ?, OutEvent = 'Out', TotalHours = COALESCE(?, TotalHours) 
+           WHERE id = ?`,
+          [MobileDateTime, GeoLocation, userLat, userLon, totalHours, targetAtt.id]
+        );
+      } else {
+        await conn.execute(
+          `INSERT INTO Attendance (EmpId, Date, DateTime, OutTime, OutLatLong, OutLatitude, OutLongitude, OutEvent, Status) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'Out', 'Present')`,
+          [EmpId, currentDate, currentDate, MobileDateTime, GeoLocation, userLat, userLon]
+        );
+      }
     }
 
     await conn.commit();

@@ -14,7 +14,10 @@ const getExpense = async (req, res) => {
     let sql = '';
     const params = [];
 
-    if (role === 'HR') {
+    const isHrOrAdmin = ['HR', 'Admin', 'admin', 'SuperAdmin', 'MANAGER'].includes(role) || 
+                        (typeof role === 'string' && (role.toLowerCase().includes('admin') || role.toLowerCase().includes('hr')));
+
+    if (isHrOrAdmin) {
       sql = `SELECT detailId, batchId, empId, expenseDate, expenseType, expenseAmount, image, Status 
              FROM ExpenseDetails ORDER BY expenseDate DESC`;
     } else {

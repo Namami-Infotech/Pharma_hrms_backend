@@ -11,13 +11,15 @@ const viewAttendance = async (req, res) => {
     let sql = '';
     const params = [];
 
-    if (role === 'HR') {
-      sql = `SELECT ActivityId, DId, MappingId, EmpId, MenuId, LocationId, Event, GeoLocation, Distance, MobileDateTime, ServerDateTime 
-             FROM Activity`;
-    } else if (empId) {
-      sql = `SELECT ActivityId, DId, MappingId, EmpId, MenuId, LocationId, Event, GeoLocation, Distance, MobileDateTime, ServerDateTime 
+    const isHrOrAdmin = role === 'HR' || role === 'Admin' || role === 'admin' || role === 'SuperAdmin';
+
+    if (empId) {
+      sql = `SELECT ActivityId, DId, MappingId, EmpId, MenuId, LocationId, Event, GeoLocation, Distance, MobileDateTime, ServerDateTime, Date, Time 
              FROM Activity WHERE EmpId = ?`;
       params.push(empId);
+    } else if (isHrOrAdmin) {
+      sql = `SELECT ActivityId, DId, MappingId, EmpId, MenuId, LocationId, Event, GeoLocation, Distance, MobileDateTime, ServerDateTime, Date, Time 
+             FROM Activity`;
     } else {
       response.message = 'EmpId parameter is missing for non-HR role.';
       return res.json(response);
@@ -25,76 +27,147 @@ const viewAttendance = async (req, res) => {
 
     const [attendanceData] = await db.query(sql, params);
 
-    if (attendanceData && attendanceData.length > 0) {
-      response.success = true;
+    // Also query Attendance table to include any records from Attendance table
+    let attSql = 'SELECT * FROM Attendance';
+    const attParams = [];
+    if (empId) {
+      attSql += ' WHERE EmpId = ?';
+      attParams.push(empId);
+    }
+    const [attData] = await db.query(attSql, attParams);
 
-      const empWiseActivities = {};
+    const empWiseActivities = {};
+    if (attendanceData && attendanceData.length > 0) {
       for (const activity of attendanceData) {
         const id = activity.EmpId;
-        const origDate = new Date(activity.MobileDateTime);
-        const adjustedDate = new Date(origDate.getTime());
+        const rawDate = activity.MobileDateTime || (activity.Date ? `${activity.Date} ${activity.Time || '00:00:00'}` : null);
+        if (!rawDate) continue;
+
+        const origDate = new Date(rawDate);
+        const adjustedDate = !isNaN(origDate.getTime()) ? new Date(origDate.getTime()) : null;
 
         // Adjust date based on reset time (if hour < 4 modify -1 day)
-        if (origDate.getHours() < 4) {
+        if (adjustedDate && adjustedDate.getHours() < 4) {
           adjustedDate.setDate(adjustedDate.getDate() - 1);
         }
 
-        const dateKey = formatDateDDMMYYYY(adjustedDate);
+        const dateKey = adjustedDate ? formatDateDDMMYYYY(adjustedDate) : (activity.Date ? formatDateDDMMYYYY(activity.Date) : null);
+        if (!dateKey || dateKey === 'N/A') continue;
 
         if (!empWiseActivities[id]) empWiseActivities[id] = {};
         if (!empWiseActivities[id][dateKey]) empWiseActivities[id][dateKey] = [];
         empWiseActivities[id][dateKey].push(activity);
       }
+    }
 
-      const processedData = [];
-      for (const [id, dateMap] of Object.entries(empWiseActivities)) {
-        for (const [dateStr, activities] of Object.entries(dateMap)) {
-          let firstIn = null;
-          let lastOut = null;
-          const firstEvent = activities[0].Event;
-          const lastEvent = activities[activities.length - 1].Event;
+    const processedData = [];
+    for (const [id, dateMap] of Object.entries(empWiseActivities)) {
+      for (const [dateStr, activities] of Object.entries(dateMap)) {
+        let firstIn = null;
+        let lastOut = null;
+        const firstEvent = activities[0].Event;
+        const lastEvent = activities[activities.length - 1].Event;
 
-          for (const act of activities) {
-            if (act.Event.includes('In') && !firstIn) {
-              firstIn = act;
-            }
-            if (act.Event.includes('Out')) {
-              lastOut = act;
-            }
+        for (const act of activities) {
+          const ev = (act.Event || '').toString().toLowerCase();
+          if (ev.includes('in') && !firstIn) {
+            firstIn = act;
           }
+          if (ev.includes('out')) {
+            lastOut = act;
+          }
+        }
 
-          let workingHours = 'N/A';
-          if (firstIn && lastOut) {
-            workingHours = calculateWorkingHours(firstIn.MobileDateTime, lastOut.MobileDateTime);
+        let workingHours = 'N/A';
+        const inTimeVal = firstIn?.MobileDateTime || firstIn?.Time;
+        const outTimeVal = lastOut?.MobileDateTime || lastOut?.Time;
+        if (inTimeVal && outTimeVal) {
+          workingHours = calculateWorkingHours(inTimeVal, outTimeVal);
+        }
+
+        processedData.push({
+          empId: id,
+          date: dateStr,
+          inActivityId: firstIn ? firstIn.ActivityId : 'N/A',
+          outActivityId: lastOut ? lastOut.ActivityId : 'N/A',
+          firstIn: firstIn ? formatTimeAMPM(firstIn.MobileDateTime || firstIn.Time) : 'N/A',
+          firstInLocation: firstIn ? firstIn.GeoLocation : 'N/A',
+          lastOut: lastOut ? formatTimeAMPM(lastOut.MobileDateTime || lastOut.Time) : 'N/A',
+          lastOutLocation: lastOut ? lastOut.GeoLocation : 'N/A',
+          workingHours,
+          firstEvent: firstEvent || 'In',
+          lastEvent: lastEvent || 'Out'
+        });
+      }
+    }
+
+    console.log(processedData,"aSsASAsaSAsas")
+
+    // Merge Attendance table records if not already in processedData
+    if (attData && attData.length > 0) {
+      for (const att of attData) {
+        const id = att.EmpId;
+        const rawDate = att.Date || att.DateTime;
+        if (!rawDate) continue;
+        const dateStr = formatDateDDMMYYYY(rawDate);
+        if (!dateStr || dateStr === 'N/A') continue;
+
+        const existing = processedData.find(p => p.empId === id && p.date === dateStr);
+        console.log("existing", existing)
+        if (!existing) {
+          const firstInTime = att.InTime ? formatTimeAMPM(att.InTime) : 'N/A';
+          const lastOutTime = att.OutTime ? formatTimeAMPM(att.OutTime) : 'N/A';
+          console.log("firstInTime1", firstInTime)
+          console.log("lastOutTime1", lastOutTime)
+          let wh = att.TotalHours && att.TotalHours !== 'N/A' ? att.TotalHours : 'N/A';
+          console.log("wh1", wh)
+          if (wh === 'N/A' && att.InTime && att.OutTime) {
+            wh = calculateWorkingHours(att.InTime, att.OutTime);
           }
 
           processedData.push({
             empId: id,
             date: dateStr,
-            inActivityId: firstIn ? firstIn.ActivityId : 'N/A',
-            outActivityId: lastOut ? lastOut.ActivityId : 'N/A',
-            firstIn: firstIn ? formatTimeAMPM(firstIn.MobileDateTime) : 'N/A',
-            firstInLocation: firstIn ? firstIn.GeoLocation : 'N/A',
-            lastOut: lastOut ? formatTimeAMPM(lastOut.MobileDateTime) : 'N/A',
-            lastOutLocation: lastOut ? lastOut.GeoLocation : 'N/A',
-            workingHours,
-            firstEvent,
-            lastEvent
+            inActivityId: att.id || 'N/A',
+            outActivityId: att.id || 'N/A',
+            firstIn: firstInTime,
+            firstInLocation: att.InLatLong || 'N/A',
+            lastOut: lastOutTime,
+            lastOutLocation: att.OutLatLong || 'N/A',
+            workingHours: wh,
+            firstEvent: att.InEvent || 'In',
+            lastEvent: att.OutEvent || 'Out'
           });
+        } else {
+          // Fill in any missing details from Attendance table
+          if (existing.workingHours === 'N/A' && att.TotalHours && att.TotalHours !== 'N/A') {
+            existing.workingHours = att.TotalHours;
+          }
+          if (existing.firstIn === 'N/A' && att.InTime) {
+            existing.firstIn = formatTimeAMPM(att.InTime);
+            existing.firstInLocation = att.InLatLong || 'N/A';
+          }
+          if (existing.lastOut === 'N/A' && att.OutTime) {
+            existing.lastOut = formatTimeAMPM(att.OutTime);
+            existing.lastOutLocation = att.OutLatLong || 'N/A';
+          }
         }
       }
+    }
 
+    if (processedData.length > 0) {
       processedData.sort((a, b) => {
         const [d1, m1, y1] = a.date.split('/');
         const [d2, m2, y2] = b.date.split('/');
         return new Date(`${y2}-${m2}-${d2}`) - new Date(`${y1}-${m1}-${d1}`);
       });
 
+      response.success = true;
       response.data = processedData;
     } else {
       response.message = 'No attendance records found.';
     }
-
+console.log("processedData", processedData)
     return res.json(response);
   } catch (err) {
     console.error('Error in viewAttendance:', err);

@@ -48,7 +48,11 @@ const editEmployee = async (req, res) => {
       'Name', 'Mobile', 'EmailId', 'Role', 'OTP', 'IsOTPExpired',
       'IsGeofence', 'Tenent_Id', 'IsActive', 'RM', 'Shift',
       'ResetTime', 'DOB', 'JoinDate', 'WeekOff', 'Designation',
-      'Grade', 'UAN', 'ESI', 'ProbationPeriod'
+      'Grade', 'UAN', 'ESI', 'ProbationPeriod',
+      'FatherName', 'PanNumber', 'AadharNumber',
+      'basic_salary', 'da', 'hra', 'conveyance', 'special_allowance',
+      'pf_deduction', 'esi_deduction', 'tds', 'advance', 'lwf',
+      'performance_bonus', 'gwr_inc'
     ];
 
     const fields = [];
@@ -56,8 +60,12 @@ const editEmployee = async (req, res) => {
 
     for (const field of updatableFields) {
       if (data[field] !== undefined) {
+        let val = data[field];
+        if ((field === 'DOB' || field === 'JoinDate') && (!val || val.toString().trim() === '')) {
+          val = null;
+        }
         fields.push(`${field} = ?`);
-        params.push(data[field]);
+        params.push(val);
       }
     }
 
@@ -77,6 +85,49 @@ const editEmployee = async (req, res) => {
         `UPDATE Employees SET ${fields.join(', ')} WHERE EmpId = ?`,
         params
       );
+    }
+
+    // Sync salary_structure_new if salary data is provided
+    if (data.basic_salary !== undefined || data.da !== undefined || data.hra !== undefined) {
+      try {
+        const basic = parseFloat(data.basic_salary || 0);
+        const da = parseFloat(data.da || 0);
+        const hra = parseFloat(data.hra || 0);
+        const conveyance = parseFloat(data.conveyance || 0);
+        const specialAllowance = parseFloat(data.special_allowance || 0);
+        const pf = parseFloat(data.pf_deduction || data.epf || 0);
+        const esi = parseFloat(data.esi_deduction || 0);
+        const grossSalary = basic + da + hra + conveyance + specialAllowance;
+        const netTakeHome = grossSalary - (pf + esi + parseFloat(data.tds || 0) + parseFloat(data.advance || 0) + parseFloat(data.lwf || 0));
+
+        await conn.execute(
+          `INSERT INTO salary_structure_new (
+            empId, emp_name, designation, department, grade,
+            basic_salary, basic_salary_per_annum, hra, hra_per_annum,
+            conveyance, conveyance_per_annum, special_allowance, special_allowance_per_annum,
+            gross_salary, gross_salary_per_annum, epf, epf_per_annum,
+            esi, esi_per_annum, total_benefits, total_benefits_per_annum,
+            total_cost_of_company, net_take_home, Tenent_Id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE
+            basic_salary = VALUES(basic_salary),
+            hra = VALUES(hra),
+            conveyance = VALUES(conveyance),
+            special_allowance = VALUES(special_allowance),
+            gross_salary = VALUES(gross_salary),
+            epf = VALUES(epf),
+            esi = VALUES(esi),
+            net_take_home = VALUES(net_take_home)`,
+          [
+            EmpId, data.Name || '', data.Designation || '', data.Role || '', data.Grade || 'A',
+            basic + da, (basic + da) * 12, hra, hra * 12,
+            conveyance, conveyance * 12, specialAllowance, specialAllowance * 12,
+            grossSalary, grossSalary * 12, pf, pf * 12,
+            esi, esi * 12, 0, 0,
+            grossSalary, netTakeHome, data.Tenent_Id || 1
+          ]
+        );
+      } catch (_) {}
     }
 
     // Update leave balances

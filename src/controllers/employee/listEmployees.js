@@ -18,8 +18,8 @@ const listEmployees = async (req, res) => {
       FROM Employees e
       LEFT JOIN EmployeeOffice eo 
         ON (e.OfficeId = eo.id OR e.OfficeId = eo.OfficeId)
-      WHERE e.Tenent_Id = ?
-      ORDER BY e.EmpId ASC
+      WHERE (e.Tenent_Id = ? OR e.Tenent_Id IS NULL)
+      ORDER BY e.id ASC
     `;
 
     const [employeeData] = await db.query(query, [tenantId]);
@@ -30,8 +30,11 @@ const listEmployees = async (req, res) => {
         emp.Role = emp.Designation;
       }
 
-      const lastEmployee = employeeData[employeeData.length - 1];
-      const lastEmpId = lastEmployee ? lastEmployee.EmpId : null;
+      // Find the genuinely latest created employee by id DESC
+      const [latestRow] = await db.query(
+        'SELECT EmpId FROM Employees ORDER BY id DESC LIMIT 1'
+      );
+      const lastEmpId = (latestRow && latestRow.length > 0) ? latestRow[0].EmpId : (employeeData[employeeData.length - 1]?.EmpId || null);
 
       response.success = true;
       response.data = employeeData;

@@ -3,26 +3,33 @@ const { getDayDiffInclusive } = require('./leaveHelper');
 
 const getLeaves = async (req, res) => {
   const response = { success: false, data: [], message: '' };
-  const empId = req.query.empId || '';
-  const role = req.query.role || '';
+  const empId = req.query.empId || req.body?.empId || '';
+  const role = req.query.role || req.body?.role || '';
 
   try {
     let sql = '';
     const params = [];
 
-    if (role) {
-      if (role === 'HR') {
-        sql = 'SELECT * FROM Leaves ORDER BY CreatedAt DESC';
-      } else {
-        response.message = 'Invalid role.';
-        return res.json(response);
+    const isHrOrAdmin = ['HR', 'Admin', 'admin', 'SuperAdmin'].includes(role);
+    const conditions = [];
+
+    if (isHrOrAdmin) {
+      if (empId) {
+        conditions.push('EmpId = ?');
+        params.push(empId);
       }
     } else if (empId) {
-      sql = 'SELECT * FROM Leaves WHERE EmpId = ? ORDER BY CreatedAt DESC';
+      conditions.push('EmpId = ?');
       params.push(empId);
     } else {
-      response.message = 'Either empId or role must be provided.';
+      response.message = 'Either empId or HR/Admin role must be provided.';
       return res.json(response);
+    }
+
+    if (conditions.length > 0) {
+      sql = `SELECT * FROM Leaves WHERE ${conditions.join(' AND ')} ORDER BY CreatedAt DESC`;
+    } else {
+      sql = 'SELECT * FROM Leaves ORDER BY CreatedAt DESC';
     }
 
     const [rows] = await db.query(sql, params);

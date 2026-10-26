@@ -21,6 +21,10 @@ router.post(['/list_employee.php', '/list_employee', '/list_employees.php', '/li
 router.get(['/view_employee.php', '/view_employee'], employeeController.viewEmployee);
 router.post(['/view_employee.php', '/view_employee'], employeeController.viewEmployee);
 
+// GET & POST /employee/get_next_emp_id.php
+router.get(['/get_next_emp_id.php', '/get_next_emp_id'], employeeController.getNextEmpId);
+router.post(['/get_next_emp_id.php', '/get_next_emp_id'], employeeController.getNextEmpId);
+
 // POST /employee/disable_employee.php
 router.post(['/disable_employee.php', '/disable_employee'], employeeController.disableEmployee);
 

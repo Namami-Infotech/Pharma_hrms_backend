@@ -1,15 +1,14 @@
 const db = require('../../config/db');
-const { getDrivingDistance } = require('./visitHelper');
 
 const getPlannedVisits = async (req, res) => {
   const response = { success: false, message: '', data: [] };
-  const empId = req.query.empId || null;
-  const role = req.query.role || null;
-  const date = req.query.date || null;
+  const empId = req.query.empId || req.body?.empId || req.query.EmpId || req.body?.EmpId || null;
+  const role = req.query.role || req.body?.role || null;
+  const date = req.query.date || req.body?.date || null;
 
   try {
     let query = `
-      SELECT 
+      SELECT
         v.VisitID,
         v.EmpId, 
         v.DealerID, 
@@ -21,32 +20,27 @@ const getPlannedVisits = async (req, res) => {
         v.MobileNo,
         v.Mode,
         v.Purpose,
-        v.Status
+        v.Status,
+        v.VisitTime,
+        v.Attachment,
+        d.Address as DealerAddress,
+        d.ContactInfo as DealerContact
       FROM Visit v
+      LEFT JOIN Dealers d ON v.DealerID = d.DealerID
       WHERE v.Plan_Visit IS NOT NULL
     `;
 
     const conditions = [];
     const params = [];
 
-    if (date) {
+    if (date && String(date).trim() !== '') {
       conditions.push('DATE(v.Plan_Visit) = ?');
-      params.push(date);
+      params.push(String(date).trim());
     }
 
-    if (role === 'HR') {
-      if (empId) {
-        conditions.push('v.EmpId = ?');
-        params.push(empId);
-      }
-    } else {
-      if (empId) {
-        conditions.push('v.EmpId = ?');
-        params.push(empId);
-      } else {
-        response.message = 'Employee ID is required for non-HR users.';
-        return res.json(response);
-      }
+    if (empId && String(empId).trim() !== '') {
+      conditions.push('v.EmpId = ?');
+      params.push(String(empId).trim());
     }
 
     conditions.push('v.old_visit IS NULL');
@@ -59,14 +53,17 @@ const getPlannedVisits = async (req, res) => {
 
     const [planVisitData] = await db.query(query, params);
 
-    if (planVisitData && planVisitData.length > 0) {
-      response.success = true;
-      response.data = planVisitData;
-      response.message = `${planVisitData.length} planned visit(s) found.`;
-    } else {
-      response.message = 'No planned visits found for the specified criteria.';
-      response.data = [];
+    for (const v of (planVisitData || [])) {
+      if (v.Attachment && Buffer.isBuffer(v.Attachment)) {
+        v.Attachment = v.Attachment.toString('base64');
+      }
     }
+
+    response.success = true;
+    response.data = planVisitData || [];
+    response.message = planVisitData && planVisitData.length > 0
+      ? `${planVisitData.length} planned visit(s) found.`
+      : 'No planned visits found for the specified criteria.';
 
     return res.json(response);
   } catch (err) {
@@ -75,7 +72,5 @@ const getPlannedVisits = async (req, res) => {
     return res.status(500).json(response);
   }
 };
-
-// 4. Plan Visit Employee (src/visit/plan_visit.php);
 
 module.exports = getPlannedVisits;

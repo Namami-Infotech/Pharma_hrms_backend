@@ -9,8 +9,10 @@ const updateExpense = async (req, res) => {
   const role = input.role || '';
 
   const allowedStatuses = ['Approved', 'Rejected'];
+  const isHrOrAdmin = ['HR', 'Admin', 'admin', 'SuperAdmin', 'MANAGER'].includes(role) || 
+                      (typeof role === 'string' && (role.toLowerCase().includes('admin') || role.toLowerCase().includes('hr')));
 
-  if (detailId && allowedStatuses.includes(status) && role === 'HR') {
+  if (detailId && allowedStatuses.includes(status) && isHrOrAdmin) {
     try {
       const [result] = await db.execute(
         'UPDATE ExpenseDetails SET Status = ? WHERE detailId = ?',

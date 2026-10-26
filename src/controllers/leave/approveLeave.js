@@ -5,8 +5,8 @@ const approveLeave = async (req, res) => {
   const response = { success: false, message: '' };
   const data = req.body || {};
 
-  const leaveId = data.id || '';
-  const status = data.status || '';
+  const leaveId = data.id || data.Id || data.leaveId || data.LeaveId || '';
+  const status = data.status || data.Status || '';
 
   if (!leaveId || !status) {
     response.message = 'Please provide leaveId and status.';
@@ -15,7 +15,7 @@ const approveLeave = async (req, res) => {
 
   const conn = await db.getConnection();
   try {
-    const [rows] = await conn.query('SELECT empid, startDate, endDate, category FROM Leaves WHERE id = ?', [leaveId]);
+    const [rows] = await conn.query('SELECT * FROM Leaves WHERE id = ?', [leaveId]);
 
     if (!rows || rows.length === 0) {
       conn.release();
@@ -24,13 +24,15 @@ const approveLeave = async (req, res) => {
     }
 
     const leaveData = rows[0];
-    const empid = leaveData.empid;
-    const category = leaveData.category;
-    const days = getDayDiffInclusive(leaveData.startDate, leaveData.endDate);
+    const empid = leaveData.EmpId || leaveData.empid;
+    const category = leaveData.category || leaveData.Category || leaveData.LeaveType;
+    const startDate = leaveData.StartDate || leaveData.startDate;
+    const endDate = leaveData.EndDate || leaveData.endDate;
+    const days = leaveData.TotalDays || getDayDiffInclusive(startDate, endDate);
 
     await conn.beginTransaction();
 
-    await conn.execute('UPDATE Leaves SET status = ? WHERE id = ?', [status, leaveId]);
+    await conn.execute('UPDATE Leaves SET Status = ?, ApprovedDate = NOW() WHERE id = ?', [status, leaveId]);
 
     if (status === 'Rejected') {
       if (category !== 'LWP' && category !== 'HalfDay') {
@@ -42,7 +44,7 @@ const approveLeave = async (req, res) => {
         }
 
         await conn.execute(
-          `UPDATE EmployeeLeave SET \`${category}\` = \`${category}\` + ? WHERE empid = ?`,
+          `UPDATE EmployeeLeave SET \`${category}\` = \`${category}\` + ? WHERE EmpId = ?`,
           [days, empid]
         );
 

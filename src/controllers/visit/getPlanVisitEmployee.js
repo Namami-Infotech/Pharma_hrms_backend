@@ -1,17 +1,11 @@
 const db = require('../../config/db');
-const { getDrivingDistance } = require('./visitHelper');
 
 const getPlanVisitEmployee = async (req, res) => {
   const response = { success: false, message: '', data: [] };
-  const empId = req.query.empId || null;
-
-  if (empId === null) {
-    response.message = '"empId" parameter is missing from the request.';
-    return res.json(response);
-  }
+  const empId = req.query.empId || req.body?.empId || req.query.EmpId || req.body?.EmpId || null;
 
   try {
-    const query = `
+    let query = `
       SELECT 
         pv.EmpId, 
         pv.DealerID, 
@@ -28,24 +22,30 @@ const getPlanVisitEmployee = async (req, res) => {
         pv.Purpose,
         pv.Status
       FROM Visit pv
-      INNER JOIN Dealers d ON pv.DealerID = d.DealerID
-      WHERE pv.EmpId = ?
+      LEFT JOIN Dealers d ON pv.DealerID = d.DealerID
+      WHERE pv.Plan_Visit IS NOT NULL
         AND NOT EXISTS (
             SELECT 1 
             FROM Visit v2 
             WHERE v2.old_visit = pv.VisitID
         )
-      ORDER BY pv.Plan_Visit DESC
     `;
 
-    const [rows] = await db.query(query, [empId]);
-
-    if (rows && rows.length > 0) {
-      response.success = true;
-      response.data = rows;
-    } else {
-      response.message = 'No plan visit records found for this employee.';
+    const params = [];
+    if (empId && String(empId).trim() !== '') {
+      query += ` AND pv.EmpId = ?`;
+      params.push(String(empId).trim());
     }
+
+    query += ` ORDER BY pv.Plan_Visit DESC`;
+
+    const [rows] = await db.query(query, params);
+
+    response.success = true;
+    response.data = rows || [];
+    response.message = rows && rows.length > 0
+      ? `${rows.length} plan visit records found.`
+      : 'No plan visit records found.';
 
     return res.json(response);
   } catch (err) {
@@ -54,7 +54,5 @@ const getPlanVisitEmployee = async (req, res) => {
     return res.status(500).json(response);
   }
 };
-
-// 5. View One Visit (src/visit/view_one_visit.php);
 
 module.exports = getPlanVisitEmployee;

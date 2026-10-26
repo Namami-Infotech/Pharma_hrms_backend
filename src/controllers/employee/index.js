@@ -6,6 +6,7 @@ const disableEmployee = require('./disableEmployee');
 const addOffice = require('./addOffice');
 const getOffice = require('./getOffice');
 const uploadEmployeeImage = require('./uploadEmployeeImage');
+const getNextEmpId = require('./getNextEmpId');
 const { hashPassword } = require('./employeeHelper');
 
 module.exports = {
@@ -17,5 +18,6 @@ module.exports = {
   addOffice,
   getOffice,
   uploadEmployeeImage,
+  getNextEmpId,
   hashPassword
 };
