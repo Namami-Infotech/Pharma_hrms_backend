@@ -53,7 +53,7 @@ moduleRouter.use('/menu', menuRoutes);
 moduleRouter.use('/', miscRoutes);
 
 // Mount under /src (file-based matching PHP) and / (clean URL)
-router.use('/src', moduleRouter);
+router.use('/', moduleRouter);
 router.use('/', moduleRouter);
 
 module.exports = router;
