@@ -1,5 +1,5 @@
 const db = require('../../config/db');
-const { verifyPassword, getOfficeDetails, getMenuByTenent } = require('./authHelper');
+const { verifyPassword, getOfficeDetails, getMenuByTenent, filterModulesByRole } = require('./authHelper');
 
 // 1. Login (src/auth/login.php)
 const login = async (req, res) => {
@@ -63,11 +63,17 @@ const login = async (req, res) => {
     // Office details
     const officeDetails = await getOfficeDetails(employee.EmpId);
 
-    // Tenant menu
-    let menu = await getMenuByTenent(employee.Tenent_Id);
-    if (employee.Role === 'Admin' || employee.Role === 'admin') {
-      menu = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
-    }
+    // Tenant menu fetched dynamically from tenent table (Menu column)
+    const tenantMenu = await getMenuByTenent(employee.Tenent_Id);
+
+    // Resolve effective role (fallback to Designation if Role is blank)
+    const effectiveRole = (employee.Role && employee.Role.trim()) ||
+      (employee.Designation && ['Admin', 'HR', 'Manager', 'Sales', 'Employee'].includes(employee.Designation.trim())
+        ? employee.Designation.trim()
+        : 'Employee');
+
+    // Filter tenant modules dynamically according to role
+    const roleModules = filterModulesByRole(effectiveRole, tenantMenu);
 
     response.success = true;
     response.message = 'Login successful';
@@ -76,7 +82,7 @@ const login = async (req, res) => {
       image: employee.Pic,
       username: employee.Name,
       email: employee.EmailId,
-      role: employee.Role,
+      role: effectiveRole,
       rm: employee.RM,
       designation: employee.Designation,
       tenent_id: employee.Tenent_Id,
@@ -84,7 +90,7 @@ const login = async (req, res) => {
       regularise: '30',
       ResetTime: employee.ResetTime || '6:00',
       office_details: officeDetails.data,
-      modules: menu,
+      modules: roleModules,
       attendanceStatus: '1',
       faceAttendance: '0'
     };

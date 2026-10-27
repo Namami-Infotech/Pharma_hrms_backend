@@ -100,9 +100,34 @@ async function getMenuByTenent(tenentId) {
   return [];
 }
 
+const ROLE_MODULES = {
+  Admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
+  SuperAdmin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
+  HR: [1, 2, 3, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22],
+  Manager: [1, 2, 3, 5, 6, 8, 9, 14, 17, 18, 19, 21, 22, 23],
+  Sales: [1, 2, 3, 4, 5, 6, 8, 9, 14, 18, 19, 21, 22, 23],
+  Employee: [1, 2, 3, 6, 8, 9, 10, 14, 21, 22],
+  default: [1, 2, 8, 9, 21, 22]
+};
+
+// Filter tenant menu by employee role
+function filterModulesByRole(role, tenantMenu = []) {
+  if (!role) return tenantMenu;
+  const normalizedKey = Object.keys(ROLE_MODULES).find(
+    k => k.toLowerCase() === role.toString().trim().toLowerCase()
+  );
+  if (!normalizedKey || normalizedKey.toLowerCase() === 'admin' || normalizedKey.toLowerCase() === 'superadmin') {
+    return tenantMenu;
+  }
+  const allowed = ROLE_MODULES[normalizedKey] || ROLE_MODULES.default;
+  return tenantMenu.filter(id => allowed.includes(id));
+}
+
 module.exports = {
   verifyPassword,
   hashPassword,
   getOfficeDetails,
-  getMenuByTenent
+  getMenuByTenent,
+  filterModulesByRole,
+  ROLE_MODULES
 };
