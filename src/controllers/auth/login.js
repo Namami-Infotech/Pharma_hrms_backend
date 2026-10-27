@@ -63,8 +63,9 @@ const login = async (req, res) => {
     // Office details
     const officeDetails = await getOfficeDetails(employee.EmpId);
 
-    // Tenant menu fetched dynamically from tenent table (Menu column)
-    const tenantMenu = await getMenuByTenent(employee.Tenent_Id);
+    // Tenant menu fetched dynamically from Tenent/tenent table (Menu column)
+    const tenantId = employee.Tenent_Id || employee.Tenent_ID || employee.tenent_id || 1;
+    const tenantMenu = await getMenuByTenent(tenantId);
 
     // Resolve effective role (fallback to Designation if Role is blank)
     const effectiveRole = (employee.Role && employee.Role.trim()) ||

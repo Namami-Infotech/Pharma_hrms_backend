@@ -85,10 +85,19 @@ async function getOfficeDetails(empId, connection = db.pool) {
 async function getMenuByTenent(tenentId) {
   if (!tenentId) return [];
   try {
-    const [rows] = await db.query(
-      'SELECT Menu FROM tenent WHERE Tenent_ID = ? LIMIT 1',
-      [tenentId]
-    );
+    let rows;
+    try {
+      [rows] = await db.query(
+        'SELECT Menu FROM Tenent WHERE Tenent_ID = ? LIMIT 1',
+        [tenentId]
+      );
+    } catch (e1) {
+      [rows] = await db.query(
+        'SELECT Menu FROM tenent WHERE Tenent_ID = ? LIMIT 1',
+        [tenentId]
+      );
+    }
+
     if (rows && rows.length > 0 && rows[0].Menu) {
       return rows[0].Menu.split(',')
         .map(x => parseInt(x.trim(), 10))
@@ -103,7 +112,7 @@ async function getMenuByTenent(tenentId) {
 const ROLE_MODULES = {
   Admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
   SuperAdmin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
-  HR: [1, 2, 3, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22],
+  HR: [1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22],
   Manager: [1, 2, 3, 5, 6, 8, 9, 14, 17, 18, 19, 21, 22, 23],
   Sales: [1, 2, 3, 4, 5, 6, 8, 9, 14, 18, 19, 21, 22, 23],
   Employee: [1, 2, 3, 6, 8, 9, 10, 14, 21, 22],
