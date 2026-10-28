@@ -93,11 +93,15 @@ async function initModuleTables() {
     }
   ];
 
-  // Remove any legacy roles that are no longer supported
-  await db.query(`
-    DELETE FROM role_permissions 
-    WHERE role_name NOT IN ('Admin', 'SuperAdmin', 'Super Admin', 'Sales', 'Employee')
-  `);
+  // Remove any legacy roles that are no longer supported (safely handled if user lacks DELETE privilege)
+  try {
+    await db.query(`
+      DELETE FROM role_permissions 
+      WHERE role_name NOT IN ('Admin', 'SuperAdmin', 'Super Admin', 'Sales', 'Employee')
+    `);
+  } catch (delErr) {
+    console.warn('[Migration] Notice: Skipped deleting legacy roles (no DELETE privilege):', delErr.message);
+  }
 
   for (const r of defaultRoles) {
     await db.query(`

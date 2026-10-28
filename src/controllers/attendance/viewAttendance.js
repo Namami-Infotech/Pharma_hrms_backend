@@ -14,18 +14,27 @@ const viewAttendance = async (req, res) => {
     const isHrOrAdmin = role === 'HR' || role === 'Admin' || role === 'admin' || role === 'SuperAdmin';
 
     if (empId) {
-      sql = `SELECT ActivityId, DId, MappingId, EmpId, MenuId, LocationId, Event, GeoLocation, Distance, MobileDateTime, ServerDateTime, Date, Time 
-             FROM Activity WHERE EmpId = ?`;
+      sql = `SELECT * FROM Activity WHERE EmpId = ?`;
       params.push(empId);
     } else if (isHrOrAdmin) {
-      sql = `SELECT ActivityId, DId, MappingId, EmpId, MenuId, LocationId, Event, GeoLocation, Distance, MobileDateTime, ServerDateTime, Date, Time 
-             FROM Activity`;
+      sql = `SELECT * FROM Activity`;
     } else {
       response.message = 'EmpId parameter is missing for non-HR role.';
       return res.json(response);
     }
 
-    const [attendanceData] = await db.query(sql, params);
+    let attendanceData = [];
+    try {
+      const [rows] = await db.query(sql, params);
+      attendanceData = rows || [];
+    } catch (actErr) {
+      try {
+        const [rows] = await db.query(sql.replace(/\bActivity\b/g, 'activity'), params);
+        attendanceData = rows || [];
+      } catch (actErr2) {
+        console.warn('Could not query Activity/activity table:', actErr2.message);
+      }
+    }
 
     // Also query Attendance table to include any records from Attendance table
     let attSql = 'SELECT * FROM Attendance';
@@ -34,7 +43,18 @@ const viewAttendance = async (req, res) => {
       attSql += ' WHERE EmpId = ?';
       attParams.push(empId);
     }
-    const [attData] = await db.query(attSql, attParams);
+    let attData = [];
+    try {
+      const [rows] = await db.query(attSql, attParams);
+      attData = rows || [];
+    } catch (attErr) {
+      try {
+        const [rows] = await db.query(attSql.replace(/\bAttendance\b/g, 'attendance'), attParams);
+        attData = rows || [];
+      } catch (attErr2) {
+        console.warn('Could not query Attendance/attendance table:', attErr2.message);
+      }
+    }
 
     const empWiseActivities = {};
     if (attendanceData && attendanceData.length > 0) {

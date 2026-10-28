@@ -88,6 +88,7 @@ const getSalarySlip = async (req, res) => {
     } catch (_) { }
 
     // 3. Fetch attendance marked days for that month and year
+    // Query Attendance table directly (with lowercase/uppercase fallback)
     let attendanceDays = 0;
     try {
       const [attRows] = await db.query(
@@ -97,18 +98,33 @@ const getSalarySlip = async (req, res) => {
            UNION
            SELECT DateTime as att_date FROM Attendance 
            WHERE EmpId = ? AND MONTH(DateTime) = ? AND YEAR(DateTime) = ? AND (Status IS NULL OR LOWER(Status) != 'absent')
-           UNION
-           SELECT DATE(MobileDateTime) as att_date FROM Activity 
-           WHERE EmpId = ? AND MONTH(MobileDateTime) = ? AND YEAR(MobileDateTime) = ?
          ) as combined
          WHERE att_date IS NOT NULL`,
-        [empId, monthNumber, year, empId, monthNumber, year, empId, monthNumber, year]
+        [empId, monthNumber, year, empId, monthNumber, year]
       );
       if (attRows && attRows[0] && attRows[0].presentCount !== undefined) {
         attendanceDays = parseInt(attRows[0].presentCount, 10) || 0;
       }
-    } catch (err) {
-      console.error('Error fetching attendance days:', err);
+    } catch (attErr) {
+      // Fallback for Linux lowercase 'attendance' table
+      try {
+        const [attRowsLower] = await db.query(
+          `SELECT COUNT(DISTINCT att_date) as presentCount FROM (
+             SELECT Date as att_date FROM attendance 
+             WHERE EmpId = ? AND MONTH(Date) = ? AND YEAR(Date) = ? AND (Status IS NULL OR LOWER(Status) != 'absent')
+             UNION
+             SELECT DateTime as att_date FROM attendance 
+             WHERE EmpId = ? AND MONTH(DateTime) = ? AND YEAR(DateTime) = ? AND (Status IS NULL OR LOWER(Status) != 'absent')
+           ) as combined
+           WHERE att_date IS NOT NULL`,
+          [empId, monthNumber, year, empId, monthNumber, year]
+        );
+        if (attRowsLower && attRowsLower[0] && attRowsLower[0].presentCount !== undefined) {
+          attendanceDays = parseInt(attRowsLower[0].presentCount, 10) || 0;
+        }
+      } catch (err2) {
+        console.error('Error fetching attendance days:', err2.message);
+      }
     }
 
     // Determine payableDays:
