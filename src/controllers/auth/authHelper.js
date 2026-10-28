@@ -121,56 +121,23 @@ function filterModulesByRole(role, tenantMenu = []) {
  */
 async function getActiveRoleModules(role, tenentId = 1, tenantMenu = []) {
   try {
-    let allowedIds = [];
-    const cleanRole = (role || 'Employee').toString().trim();
-    const normalizedRole = cleanRole.toLowerCase().replace(/[\s_-]+/g, ''); // Handles "Super Admin", "SuperAdmin", "super_admin"
-
-    // 1. Fetch allowed module IDs from role_permissions table in database
-    const [roleRows] = await db.query(
-      `SELECT module_ids FROM role_permissions 
-       WHERE (LOWER(REPLACE(role_name, ' ', '')) = ? OR LOWER(role_name) = LOWER(?)) 
-         AND (tenent_id = ? OR tenent_id = 1) 
-       ORDER BY id ASC LIMIT 1`,
-      [normalizedRole, cleanRole, tenentId]
-    );
-
-    if (roleRows && roleRows.length > 0 && roleRows[0].module_ids) {
-      allowedIds = roleRows[0].module_ids
-        .split(',')
-        .map(x => parseInt(x.trim(), 10))
-        .filter(n => !isNaN(n));
-    } else {
-      // Fallback: If role not matched, load default 'Employee' permissions from DB
-      const [defaultRows] = await db.query(
-        "SELECT module_ids FROM role_permissions WHERE LOWER(role_name) = 'employee' AND (tenent_id = ? OR tenent_id = 1) LIMIT 1",
-        [tenentId]
+    // Return all active modules from modules table (where is_active = 1)
+    let rows;
+    try {
+      [rows] = await db.query(
+        `SELECT id, name, path, icon, category, display_order 
+         FROM modules 
+         WHERE is_active = 1 
+         ORDER BY display_order ASC`
       );
-      if (defaultRows && defaultRows.length > 0 && defaultRows[0].module_ids) {
-        allowedIds = defaultRows[0].module_ids
-          .split(',')
-          .map(x => parseInt(x.trim(), 10))
-          .filter(n => !isNaN(n));
-      }
+    } catch (e1) {
+      [rows] = await db.query(
+        `SELECT id, name, path, icon, category, display_order 
+         FROM Modules 
+         WHERE is_active = 1 
+         ORDER BY display_order ASC`
+      );
     }
-
-    // If tenantMenu is provided and non-empty, intersect with tenantMenu
-    if (tenantMenu && tenantMenu.length > 0) {
-      allowedIds = allowedIds.filter(id => tenantMenu.includes(id));
-    }
-
-    if (allowedIds.length === 0) {
-      return { moduleIds: [], moduleList: [], modulesDetail: [] };
-    }
-
-    // 2. Query active modules directly from modules table (WHERE is_active = 1)
-    const placeholders = allowedIds.map(() => '?').join(',');
-    const [rows] = await db.query(
-      `SELECT id, name, path, icon, category, display_order 
-       FROM modules 
-       WHERE id IN (${placeholders}) AND is_active = 1 
-       ORDER BY display_order ASC`,
-      allowedIds
-    );
 
     const activeList = rows || [];
     const moduleIds = activeList.map(m => m.id);

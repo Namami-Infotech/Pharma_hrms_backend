@@ -73,8 +73,8 @@ const login = async (req, res) => {
         ? employee.Designation.trim()
         : 'Employee');
 
-    // Fetch active modules dynamically from database (only is_active = 1)
-    const { moduleIds, moduleList, modulesDetail } = await getActiveRoleModules(effectiveRole, tenantId, tenantMenu);
+    // Fetch all active modules dynamically from database (only is_active = 1, no role validation)
+    const { moduleIds } = await getActiveRoleModules();
 
     response.success = true;
     response.message = 'Login successful';
@@ -92,8 +92,6 @@ const login = async (req, res) => {
       ResetTime: employee.ResetTime || '6:00',
       office_details: officeDetails.data,
       modules: moduleIds,
-      module_list: moduleList,
-      modules_detail: modulesDetail,
       attendanceStatus: '1',
       faceAttendance: '0'
     };

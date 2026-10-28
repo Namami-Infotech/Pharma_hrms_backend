@@ -42,7 +42,7 @@ const verifyOtp = async (req, res) => {
 
       const officeDetails = await getOfficeDetails(employee.EmpId);
       const menu = await getMenuByTenent(employee.Tenent_Id);
-      const { moduleIds, moduleList, modulesDetail } = await getActiveRoleModules(employee.Role || employee.Designation || 'Employee', employee.Tenent_Id, menu);
+      const { moduleIds, moduleList, modulesDetail } = await getActiveRoleModules();
 
       response.success = true;
       response.message = 'Login successful (Test User)';
@@ -60,8 +60,6 @@ const verifyOtp = async (req, res) => {
         office_details: officeDetails.data,
         regularise: '30',
         modules: moduleIds,
-        module_list: moduleList,
-        modules_detail: modulesDetail,
         attendanceStatus: '1',
         faceAttendance: '0',
         mobileId,
@@ -98,7 +96,7 @@ const verifyOtp = async (req, res) => {
 
       const officeDetails = await getOfficeDetails(employee.EmpId);
       const menu = await getMenuByTenent(employee.Tenent_Id);
-      const { moduleIds, moduleList, modulesDetail } = await getActiveRoleModules(employee.Role || employee.Designation || 'Employee', employee.Tenent_Id, menu);
+      const { moduleIds, moduleList, modulesDetail } = await getActiveRoleModules();
 
       response.success = true;
       response.message = 'Login successful';
@@ -116,8 +114,6 @@ const verifyOtp = async (req, res) => {
         tenent_id: employee.Tenent_Id,
         office_details: officeDetails.data,
         modules: moduleIds,
-        module_list: moduleList,
-        modules_detail: modulesDetail,
         attendanceStatus: '1',
         faceAttendance: '0',
         mobileId,
