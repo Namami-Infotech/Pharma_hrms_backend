@@ -14,21 +14,25 @@ const createQuotation = async (req, res) => {
   const currentYear = new Date().getFullYear();
 
   try {
-    // 1. Auto-generate quotation number if not provided
+    // 1. Auto-generate quotation number if not provided or contains placeholder like PREVIEW/AUTO
     let quotationNo = (data.quotation_no || '').trim();
-    if (!quotationNo) {
-      const [latest] = await db.query(
-        'SELECT quotation_no FROM Quotations WHERE quotation_no LIKE ? ORDER BY id DESC LIMIT 1',
+    if (!quotationNo || quotationNo.toUpperCase().includes('PREVIEW') || quotationNo.toUpperCase().includes('AUTO')) {
+      const [allYearRows] = await db.query(
+        'SELECT quotation_no FROM Quotations WHERE quotation_no LIKE ?',
         [`AP/QT/${currentYear}/%`]
       );
 
-      let nextNum = 1;
-      if (latest && latest.length > 0) {
-        const m = latest[0].quotation_no.match(/([0-9]+)$/);
-        if (m) {
-          nextNum = parseInt(m[1], 10) + 1;
+      let maxNum = 0;
+      if (allYearRows && allYearRows.length > 0) {
+        for (const row of allYearRows) {
+          const m = (row.quotation_no || '').match(/([0-9]+)$/);
+          if (m) {
+            const num = parseInt(m[1], 10);
+            if (num > maxNum) maxNum = num;
+          }
         }
       }
+      const nextNum = maxNum + 1;
       quotationNo = `AP/QT/${currentYear}/${String(nextNum).padStart(4, '0')}`;
     }
 

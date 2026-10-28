@@ -85,7 +85,7 @@ const getSalarySlip = async (req, res) => {
         [monthNumber, year, empId]
       );
       if (recRows && recRows.length > 0) record = recRows[0];
-    } catch (_) {}
+    } catch (_) { }
 
     // 3. Fetch attendance marked days for that month and year
     let attendanceDays = 0;
@@ -173,7 +173,7 @@ const getSalarySlip = async (req, res) => {
         if (!isNaN(d.getTime())) {
           dobFormatted = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getFullYear()).slice(-2)}`;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     let dojFormatted = 'NA';
@@ -183,7 +183,7 @@ const getSalarySlip = async (req, res) => {
         if (!isNaN(d.getTime())) {
           dojFormatted = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getFullYear()).slice(-2)}`;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     const payload = {

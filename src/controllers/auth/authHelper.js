@@ -109,27 +109,92 @@ async function getMenuByTenent(tenentId) {
   return [];
 }
 
-const ROLE_MODULES = {
-  Admin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
-  SuperAdmin: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
-  HR: [1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22],
-  Manager: [1, 2, 3, 5, 6, 8, 9, 14, 17, 18, 19, 21, 22, 23],
-  Sales: [1, 2, 3, 4, 5, 6, 8, 9, 14, 18, 19, 21, 22, 23],
-  Employee: [1, 2, 3, 6, 8, 9, 10, 14, 21, 22],
-  default: [1, 2, 8, 9, 21, 22]
-};
-
-// Filter tenant menu by employee role
+// Filter tenant menu by employee role (backward compatibility)
 function filterModulesByRole(role, tenantMenu = []) {
-  if (!role) return tenantMenu;
-  const normalizedKey = Object.keys(ROLE_MODULES).find(
-    k => k.toLowerCase() === role.toString().trim().toLowerCase()
-  );
-  if (!normalizedKey || normalizedKey.toLowerCase() === 'admin' || normalizedKey.toLowerCase() === 'superadmin') {
-    return tenantMenu;
+  return tenantMenu;
+}
+
+/**
+ * Helper: Get active modules and permissions for a given role and tenant directly from DB.
+ * Everything comes 100% dynamically from role_permissions and modules tables.
+ * Only returns modules where is_active = 1 (inactive modules like invoices, reports, etc. are excluded).
+ */
+async function getActiveRoleModules(role, tenentId = 1, tenantMenu = []) {
+  try {
+    let allowedIds = [];
+    const cleanRole = (role || 'Employee').toString().trim();
+    const normalizedRole = cleanRole.toLowerCase().replace(/[\s_-]+/g, ''); // Handles "Super Admin", "SuperAdmin", "super_admin"
+
+    // 1. Fetch allowed module IDs from role_permissions table in database
+    const [roleRows] = await db.query(
+      `SELECT module_ids FROM role_permissions 
+       WHERE (LOWER(REPLACE(role_name, ' ', '')) = ? OR LOWER(role_name) = LOWER(?)) 
+         AND (tenent_id = ? OR tenent_id = 1) 
+       ORDER BY id ASC LIMIT 1`,
+      [normalizedRole, cleanRole, tenentId]
+    );
+
+    if (roleRows && roleRows.length > 0 && roleRows[0].module_ids) {
+      allowedIds = roleRows[0].module_ids
+        .split(',')
+        .map(x => parseInt(x.trim(), 10))
+        .filter(n => !isNaN(n));
+    } else {
+      // Fallback: If role not matched, load default 'Employee' permissions from DB
+      const [defaultRows] = await db.query(
+        "SELECT module_ids FROM role_permissions WHERE LOWER(role_name) = 'employee' AND (tenent_id = ? OR tenent_id = 1) LIMIT 1",
+        [tenentId]
+      );
+      if (defaultRows && defaultRows.length > 0 && defaultRows[0].module_ids) {
+        allowedIds = defaultRows[0].module_ids
+          .split(',')
+          .map(x => parseInt(x.trim(), 10))
+          .filter(n => !isNaN(n));
+      }
+    }
+
+    // If tenantMenu is provided and non-empty, intersect with tenantMenu
+    if (tenantMenu && tenantMenu.length > 0) {
+      allowedIds = allowedIds.filter(id => tenantMenu.includes(id));
+    }
+
+    if (allowedIds.length === 0) {
+      return { moduleIds: [], moduleList: [], modulesDetail: [] };
+    }
+
+    // 2. Query active modules directly from modules table (WHERE is_active = 1)
+    const placeholders = allowedIds.map(() => '?').join(',');
+    const [rows] = await db.query(
+      `SELECT id, name, path, icon, category, display_order 
+       FROM modules 
+       WHERE id IN (${placeholders}) AND is_active = 1 
+       ORDER BY display_order ASC`,
+      allowedIds
+    );
+
+    const activeList = rows || [];
+    const moduleIds = activeList.map(m => m.id);
+    const moduleList = activeList.map(m => ({
+      id: m.id,
+      name: m.name,
+      path: m.path,
+      icon: m.icon,
+      category: m.category
+    }));
+    const modulesDetail = activeList.map(m => ({
+      id: m.id,
+      name: m.name
+    }));
+
+    return { moduleIds, moduleList, modulesDetail };
+  } catch (err) {
+    console.error('Error in getActiveRoleModules:', err);
+    return {
+      moduleIds: [],
+      moduleList: [],
+      modulesDetail: []
+    };
   }
-  const allowed = ROLE_MODULES[normalizedKey] || ROLE_MODULES.default;
-  return tenantMenu.filter(id => allowed.includes(id));
 }
 
 module.exports = {
@@ -138,5 +203,5 @@ module.exports = {
   getOfficeDetails,
   getMenuByTenent,
   filterModulesByRole,
-  ROLE_MODULES
+  getActiveRoleModules
 };

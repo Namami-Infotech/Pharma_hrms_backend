@@ -1,5 +1,5 @@
 const db = require('../../config/db');
-const { verifyPassword, getOfficeDetails, getMenuByTenent, filterModulesByRole } = require('./authHelper');
+const { verifyPassword, getOfficeDetails, getMenuByTenent, filterModulesByRole, getActiveRoleModules } = require('./authHelper');
 
 // 1. Login (src/auth/login.php)
 const login = async (req, res) => {
@@ -67,14 +67,14 @@ const login = async (req, res) => {
     const tenantId = employee.Tenent_Id || employee.Tenent_ID || employee.tenent_id || 1;
     const tenantMenu = await getMenuByTenent(tenantId);
 
-    // Resolve effective role (fallback to Designation if Role is blank)
+    // Resolve effective role (fallback to Designation if Role is blank, default to Employee)
     const effectiveRole = (employee.Role && employee.Role.trim()) ||
-      (employee.Designation && ['Admin', 'HR', 'Manager', 'Sales', 'Employee'].includes(employee.Designation.trim())
+      (employee.Designation && ['Admin', 'SuperAdmin', 'Super Admin', 'Sales', 'Employee'].includes(employee.Designation.trim())
         ? employee.Designation.trim()
         : 'Employee');
 
-    // Filter tenant modules dynamically according to role
-    const roleModules = filterModulesByRole(effectiveRole, tenantMenu);
+    // Fetch active modules dynamically from database (only is_active = 1)
+    const { moduleIds, moduleList, modulesDetail } = await getActiveRoleModules(effectiveRole, tenantId, tenantMenu);
 
     response.success = true;
     response.message = 'Login successful';
@@ -91,7 +91,9 @@ const login = async (req, res) => {
       regularise: '30',
       ResetTime: employee.ResetTime || '6:00',
       office_details: officeDetails.data,
-      modules: roleModules,
+      modules: moduleIds,
+      module_list: moduleList,
+      modules_detail: modulesDetail,
       attendanceStatus: '1',
       faceAttendance: '0'
     };

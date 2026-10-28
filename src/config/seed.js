@@ -337,6 +337,15 @@ async function seedDatabase() {
       // Non-blocking
     }
 
+    // Step 7: Ensure modules and role_permissions tables and active statuses are seeded
+    try {
+      const { initModuleTables } = require('./init_module_tables');
+      await initModuleTables();
+      console.log('[Database Seeder] ✓ Modules and role permissions verified.');
+    } catch (modErr) {
+      console.warn('[Database Seeder] Error verifying modules tables:', modErr.message);
+    }
+
     console.log('[Database Seeder] Database check & seeding completed successfully.\n');
     printCredentialsSummary();
     return true;

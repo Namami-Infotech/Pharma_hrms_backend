@@ -1,5 +1,5 @@
 const db = require('../../config/db');
-const { getOfficeDetails, getMenuByTenent } = require('./authHelper');
+const { getOfficeDetails, getMenuByTenent, getActiveRoleModules } = require('./authHelper');
 
 // 3. OTP Validation (src/auth/otp.php)
 const verifyOtp = async (req, res) => {
@@ -42,6 +42,7 @@ const verifyOtp = async (req, res) => {
 
       const officeDetails = await getOfficeDetails(employee.EmpId);
       const menu = await getMenuByTenent(employee.Tenent_Id);
+      const { moduleIds, moduleList, modulesDetail } = await getActiveRoleModules(employee.Role || employee.Designation || 'Employee', employee.Tenent_Id, menu);
 
       response.success = true;
       response.message = 'Login successful (Test User)';
@@ -58,7 +59,9 @@ const verifyOtp = async (req, res) => {
         tenent_id: employee.Tenent_Id,
         office_details: officeDetails.data,
         regularise: '30',
-        modules: menu,
+        modules: moduleIds,
+        module_list: moduleList,
+        modules_detail: modulesDetail,
         attendanceStatus: '1',
         faceAttendance: '0',
         mobileId,
@@ -95,6 +98,7 @@ const verifyOtp = async (req, res) => {
 
       const officeDetails = await getOfficeDetails(employee.EmpId);
       const menu = await getMenuByTenent(employee.Tenent_Id);
+      const { moduleIds, moduleList, modulesDetail } = await getActiveRoleModules(employee.Role || employee.Designation || 'Employee', employee.Tenent_Id, menu);
 
       response.success = true;
       response.message = 'Login successful';
@@ -111,7 +115,9 @@ const verifyOtp = async (req, res) => {
         regularise: '30',
         tenent_id: employee.Tenent_Id,
         office_details: officeDetails.data,
-        modules: menu,
+        modules: moduleIds,
+        module_list: moduleList,
+        modules_detail: modulesDetail,
         attendanceStatus: '1',
         faceAttendance: '0',
         mobileId,
