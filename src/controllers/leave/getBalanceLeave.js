@@ -14,8 +14,22 @@ const getBalanceLeave = async (req, res) => {
     const [rows] = await db.query('SELECT * FROM EmployeeLeave WHERE EmpId = ? ORDER BY id DESC', [empid]);
 
     if (rows && rows.length > 0) {
-      const data = rows[0];
+      const data = { ...rows[0] };
       data.HalfDay = 1;
+
+      response.TotalLeave = data.TotalLeave ?? data.totalLeave ?? 0;
+      response.BalanceLeave = data.BalanceLeave ?? data.balanceLeave ?? 0;
+      response.Tenent_Id = data.Tenent_Id ?? data.tenent_id ?? null;
+      response.FinancialYear = data.FinancialYear ?? data.financialYear ?? null;
+
+      delete data.TotalLeave;
+      delete data.totalLeave;
+      delete data.BalanceLeave;
+      delete data.balanceLeave;
+      delete data.Tenent_Id;
+      delete data.tenent_id;
+      delete data.FinancialYear;
+      delete data.financialYear;
 
       response.success = true;
       response.data = data;
