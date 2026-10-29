@@ -101,23 +101,35 @@ function calculateWorkingHours(startDate, endDate) {
 function saveBase64Image(base64Image, subfolder = 'attendance') {
   if (!base64Image || typeof base64Image !== 'string') return null;
 
-  const matches = base64Image.match(/^data:image\/(\w+);base64,/);
-  if (!matches) return null;
-
-  const imageType = matches[1];
-  const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
-  const buffer = Buffer.from(base64Data, 'base64');
-
-  const uploadDir = path.join(__dirname, `../../../uploads/${subfolder}`);
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
+  if (base64Image.startsWith('http://') || base64Image.startsWith('https://')) {
+    return base64Image;
   }
 
-  const imageName = `${Date.now()}_${Math.floor(100 + Math.random() * 900)}.${imageType}`;
-  const filePath = path.join(uploadDir, imageName);
-  fs.writeFileSync(filePath, buffer);
+  let imageType = 'png';
+  let base64Data = base64Image;
 
-  return `https://namami-infotech.com/SAFEGUARD/src/${subfolder}/uploads/${imageName}`;
+  const matches = base64Image.match(/^data:image\/(\w+);base64,/);
+  if (matches) {
+    imageType = matches[1];
+    base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+  }
+
+  try {
+    const buffer = Buffer.from(base64Data, 'base64');
+    const uploadDir = path.join(__dirname, `../../../uploads/${subfolder}`);
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const imageName = `${Date.now()}_${Math.floor(100 + Math.random() * 900)}.${imageType}`;
+    const filePath = path.join(uploadDir, imageName);
+    fs.writeFileSync(filePath, buffer);
+
+    return `https://namami-infotech.com/SAFEGUARD/src/${subfolder}/uploads/${imageName}`;
+  } catch (err) {
+    console.error('Error in saveBase64Image:', err);
+    return null;
+  }
 }
 
 module.exports = {

@@ -5,7 +5,7 @@ const applyLeave = async (req, res) => {
   const response = { success: false, message: '' };
   const data = req.body || {};
 
-  const empid = data.empid || '';
+  const empid = data.empid || data.EmpId || data.empId || data.emp_id || '';
   const startDate = data.startDate || '';
   const endDate = data.endDate || '';
   const reason = data.reason || '';

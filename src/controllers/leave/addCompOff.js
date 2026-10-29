@@ -5,7 +5,7 @@ const addCompOff = async (req, res) => {
   const response = { success: false, message: '' };
   const data = req.body || {};
 
-  const empid = data.empid || '';
+  const empid = data.empid || data.EmpId || data.empId || data.emp_id || '';
   const compOffDays = parseFloat(data.compOffDays);
   const compOffDate = data.compOffDate || '';
 
