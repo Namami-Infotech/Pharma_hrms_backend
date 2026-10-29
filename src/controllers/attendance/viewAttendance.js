@@ -121,7 +121,7 @@ const viewAttendance = async (req, res) => {
       }
     }
 
-    console.log(processedData,"aSsASAsaSAsas")
+    console.log(processedData, "aSsASAsaSAsas")
 
     // Merge Attendance table records if not already in processedData
     if (attData && attData.length > 0) {
@@ -187,7 +187,7 @@ const viewAttendance = async (req, res) => {
     } else {
       response.message = 'No attendance records found.';
     }
-console.log("processedData", processedData)
+    console.log("processedData", processedData)
     return res.json(response);
   } catch (err) {
     console.error('Error in viewAttendance:', err);

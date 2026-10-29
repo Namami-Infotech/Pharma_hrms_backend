@@ -40,6 +40,7 @@ const markAttendance = async (req, res) => {
   const originalEvent = Event;
   const eventLower = Event.toLowerCase();
   let baseEvent = Event;
+  
 
   if (eventLower.startsWith('in')) {
     baseEvent = 'In';

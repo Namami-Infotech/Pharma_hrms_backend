@@ -15,21 +15,35 @@ const getMobileAttendance = async (req, res) => {
       params.push(empId);
     }
 
-    const [attendanceRecords] = await db.query(sql, params);
+    let attendanceRecords = [];
+    try {
+      const [rows] = await db.query(sql, params);
+      attendanceRecords = rows || [];
+    } catch (tblErr) {
+      try {
+        const [rows] = await db.query(sql.replace(/\bAttendance\b/g, 'attendance'), params);
+        attendanceRecords = rows || [];
+      } catch (tblErr2) {
+        console.warn('Could not query Attendance/attendance table:', tblErr2.message);
+      }
+    }
 
     if (attendanceRecords && attendanceRecords.length > 0) {
       const formattedRecords = attendanceRecords.map(record => {
-        const rawDate = record.InTime || record.OutTime || new Date();
+        // Correct date column: Date or DateTime or create_time
+        const rawDate = record.Date || record.DateTime || record.create_time;
         const dateStr = formatDateDDMMYYYY(rawDate);
         const firstIn = formatTimeAMPM(record.InTime);
         const firstInLocation = record.InLatLong || 'N/A';
-        const inActivityId = record.Id || 'N/A';
+        const inActivityId = record.id ?? record.Id ?? 'N/A';
 
         const lastOut = formatTimeAMPM(record.OutTime);
         const lastOutLocation = record.OutLatLong || 'N/A';
-        const outActivityId = record.OutTime ? record.Id : 'N/A';
+        const outActivityId = record.OutTime ? (record.id ?? record.Id ?? 'N/A') : 'N/A';
 
-        const workingHours = calculateWorkingHours(record.InTime, record.OutTime);
+        let workingHours = record.TotalHours && record.TotalHours !== 'N/A' 
+          ? record.TotalHours 
+          : calculateWorkingHours(record.InTime, record.OutTime);
 
         return {
           empId: record.EmpId,
@@ -42,8 +56,8 @@ const getMobileAttendance = async (req, res) => {
           lastOutLocation,
           workingHours,
           firstEvent: record.InEvent || 'In',
-          lastEvent: record.OutEvent || 'In',
-          status: record.RegulariseStatus
+          lastEvent: record.OutEvent || 'Out',
+          status: record.RegulariseStatus ?? 0
         };
       });
 
