@@ -33,22 +33,14 @@ const markAttendance = async (req, res) => {
   const userLat = parseFloat(latStr);
   const userLon = parseFloat(lonStr);
 
-  const actualDistance = parseFloat(
-    calculateDistance(userLat, userLon, OFFICE_LAT, OFFICE_LON).toFixed(2)
-  );
+  const actualDistance = 0;
 
-  const originalEvent = Event;
-  const eventLower = Event.toLowerCase();
-  let baseEvent = Event;
-  
-
+  const eventLower = (Event || '').toString().toLowerCase().trim();
   if (eventLower.startsWith('in')) {
-    baseEvent = 'In';
+    Event = 'In';
   } else if (eventLower.startsWith('out')) {
-    baseEvent = 'Out';
+    Event = 'Out';
   }
-
-  Event = actualDistance <= 200 ? baseEvent : originalEvent;
 
   const currentDate = new Date(MobileDateTime).toISOString().slice(0, 10);
 

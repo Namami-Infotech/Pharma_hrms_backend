@@ -1,8 +1,8 @@
 const path = require('path');
 const fs = require('fs');
 
-const OFFICE_LAT = 29.954646;
-const OFFICE_LON = 78.0749902;
+const OFFICE_LAT = null;
+const OFFICE_LON = null;
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const earthRadius = 6371000;

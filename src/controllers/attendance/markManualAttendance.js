@@ -29,11 +29,6 @@ const markManualAttendance = async (req, res) => {
     const coords = GeoLocation.split(',').map((n) => parseFloat(n.trim()));
     userLat = isNaN(coords[0]) ? null : coords[0];
     userLon = isNaN(coords[1]) ? null : coords[1];
-    if (userLat !== null && userLon !== null && (userLat !== 0 || userLon !== 0)) {
-      actualDistance = parseFloat(
-        calculateDistance(userLat, userLon, OFFICE_LAT, OFFICE_LON).toFixed(2)
-      );
-    }
   }
 
   Event = Event.toLowerCase().trim().startsWith('in') ? 'In' : 'Out';

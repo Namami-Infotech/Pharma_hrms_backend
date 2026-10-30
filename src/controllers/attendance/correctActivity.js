@@ -23,13 +23,11 @@ const correctActivity = async (req, res) => {
 
       if (!geo || !geo.includes(',')) continue;
 
-      const [lat, lng] = geo.split(',').map(Number);
-      const actualDist = calculateDistance(lat, lng, OFFICE_LAT, OFFICE_LON);
-
       let newEvent = event;
-      if (actualDist <= 200) {
+      if (event) {
         newEvent = event.toLowerCase().includes('out') ? 'Out' : 'In';
       }
+      const actualDist = 0;
 
       await db.execute(
         'UPDATE Activity_New SET Distance = ?, Event = ? WHERE ActivityId = ?',
