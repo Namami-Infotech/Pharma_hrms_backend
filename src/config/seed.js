@@ -61,70 +61,6 @@ const SEED_USERS = [
     ResetTime: '06:00:00',
     Tenent_Id: 1,
     IsActive: 1
-  },
-  {
-    EmpId: 'HR001',
-    Name: 'HR Manager',
-    EmailId: 'hr@safeguard.com',
-    Mobile: '9876543211',
-    PlainPassword: 'Hr@123',
-    Role: 'HR',
-    Designation: 'HR Head',
-    Department: 'Human Resources',
-    OfficeId: '1,2',
-    RM: 'ADMIN001',
-    Shift: 'General (9:00 AM - 6:00 PM)',
-    ResetTime: '06:00:00',
-    Tenent_Id: 1,
-    IsActive: 1
-  },
-  {
-    EmpId: 'MGR001',
-    Name: 'Regional Manager',
-    EmailId: 'manager@safeguard.com',
-    Mobile: '9876543212',
-    PlainPassword: 'Manager@123',
-    Role: 'Manager',
-    Designation: 'Area Sales Manager',
-    Department: 'Sales & Marketing',
-    OfficeId: '1,2,3',
-    RM: 'ADMIN001',
-    Shift: 'General (9:00 AM - 6:00 PM)',
-    ResetTime: '06:00:00',
-    Tenent_Id: 1,
-    IsActive: 1
-  },
-  {
-    EmpId: 'EMP001',
-    Name: 'Field Officer',
-    EmailId: 'employee@safeguard.com',
-    Mobile: '9876543213',
-    PlainPassword: 'Employee@123',
-    Role: 'Employee',
-    Designation: 'Medical Representative',
-    Department: 'Field Sales',
-    OfficeId: '1',
-    RM: 'MGR001',
-    Shift: 'General (9:00 AM - 6:00 PM)',
-    ResetTime: '06:00:00',
-    Tenent_Id: 1,
-    IsActive: 1
-  },
-  {
-    EmpId: '123456',
-    Name: 'Demo User',
-    EmailId: 'demo@safeguard.com',
-    Mobile: '9999999999',
-    PlainPassword: 'Demo@123',
-    Role: 'Employee',
-    Designation: 'Sales Executive',
-    Department: 'Sales',
-    OfficeId: '1',
-    RM: 'MGR001',
-    Shift: 'General (9:00 AM - 6:00 PM)',
-    ResetTime: '06:00:00',
-    Tenent_Id: 1,
-    IsActive: 1
   }
 ];
 
@@ -132,7 +68,6 @@ const DEFAULT_HOLIDAYS = [
   { date: '2026-01-26', title: 'Republic Day', Tenent_Id: 1 },
   { date: '2026-08-15', title: 'Independence Day', Tenent_Id: 1 },
   { date: '2026-10-02', title: 'Gandhi Jayanti', Tenent_Id: 1 },
-  { date: '2026-11-08', title: 'Diwali', Tenent_Id: 1 },
   { date: '2026-12-25', title: 'Christmas Day', Tenent_Id: 1 }
 ];
 

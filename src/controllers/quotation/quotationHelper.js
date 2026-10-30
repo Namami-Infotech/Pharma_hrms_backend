@@ -32,7 +32,57 @@ const numberToWords = (num) => {
   return (inWords(val) + ' Rupees Only');
 };
 
+/**
+ * Checks if any item has discount > 35%, or overall discount > 35%
+ */
+const checkDiscountRequiresApproval = (items = [], overallDiscount = 0) => {
+  let parsed = [];
+  try {
+    parsed = Array.isArray(items) ? items : (typeof items === 'string' ? JSON.parse(items || '[]') : []);
+  } catch (_) {
+    parsed = [];
+  }
+
+  const hasItemAboveLimit = parsed.some((it) => {
+    const disc = parseFloat(it.discount) || 0;
+    return disc > 35;
+  });
+
+  const hasOverallAboveLimit = (parseFloat(overallDiscount) || 0) > 35;
+
+  return hasItemAboveLimit || hasOverallAboveLimit;
+};
+
+/**
+ * Looks up the RM's email for a given employee (by EmpId, Name, or id)
+ */
+const getRmEmailForEmployee = async (db, empIdentifier) => {
+  if (!empIdentifier) return null;
+  try {
+    const [empRows] = await db.query(
+      'SELECT EmpId, Name, EmailId, RM FROM Employees WHERE EmpId = ? OR Name = ? OR id = ? LIMIT 1',
+      [empIdentifier, empIdentifier, empIdentifier]
+    );
+    if (!empRows || empRows.length === 0) return null;
+    const emp = empRows[0];
+    if (!emp.RM) return null;
+
+    const [rmRows] = await db.query(
+      'SELECT EmpId, Name, EmailId FROM Employees WHERE EmpId = ? OR Name = ? OR id = ? LIMIT 1',
+      [emp.RM, emp.RM, emp.RM]
+    );
+    if (rmRows && rmRows.length > 0 && rmRows[0].EmailId) {
+      return rmRows[0].EmailId.trim();
+    }
+  } catch (err) {
+    console.warn('[QuotationHelper] Error finding RM email:', err.message);
+  }
+  return null;
+};
+
 module.exports = {
   COMPANY_DETAILS,
-  numberToWords
+  numberToWords,
+  checkDiscountRequiresApproval,
+  getRmEmailForEmployee
 };

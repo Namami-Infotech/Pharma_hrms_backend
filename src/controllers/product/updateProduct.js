@@ -41,7 +41,9 @@ const updateProduct = async (req, res) => {
 
     const updatedName = name !== undefined ? name.trim() : current.name;
     const updatedUnit = unit !== undefined ? unit.trim() : current.unit;
-    const updatedPackaging = packaging !== undefined ? packaging.trim() : current.packaging;
+    const updatedPackaging = (packaging !== undefined && packaging !== null && packaging.trim()) 
+      ? packaging.trim() 
+      : (current.packaging || updatedUnit || '');
     const updatedPrice = price !== undefined ? Math.round(parseFloat(price) * 100) / 100 : current.price;
     const updatedCode = product_code !== undefined ? product_code.trim() : current.product_code;
     const updatedHsn = hsn !== undefined ? hsn.trim() : current.hsn;
@@ -55,9 +57,6 @@ const updateProduct = async (req, res) => {
     }
     if (!updatedUnit) {
       return res.status(400).json({ success: false, message: 'Product Unit cannot be empty' });
-    }
-    if (!updatedPackaging) {
-      return res.status(400).json({ success: false, message: 'Packaging cannot be empty' });
     }
     if (isNaN(updatedPrice) || updatedPrice < 0) {
       return res.status(400).json({ success: false, message: 'Price must be a valid non-negative number' });

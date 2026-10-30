@@ -185,7 +185,14 @@ const getDealers = async (req, res) => {
       }
     }
 
-    const result = Array.from(activityDealerMap.values());
+    const result = Array.from(activityDealerMap.values()).sort((a, b) => {
+      const idA = parseInt(a.DealerID || a.ActivityId || 0, 10);
+      const idB = parseInt(b.DealerID || b.ActivityId || 0, 10);
+      if (!isNaN(idA) && !isNaN(idB) && idA !== idB) {
+        return idB - idA;
+      }
+      return new Date(b.CreatedAt || b.CreateDate || 0) - new Date(a.CreatedAt || a.CreateDate || 0);
+    });
 
     response.success = true;
     response.message = 'Dealers fetched successfully.';

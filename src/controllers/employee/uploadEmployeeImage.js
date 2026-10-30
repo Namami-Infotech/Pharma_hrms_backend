@@ -15,7 +15,8 @@ const uploadEmployeeImage = async (req, res) => {
   }
 
   const fileName = req.file.filename;
-  const fileUrl = `https://namami-infotech.com/SAFEGUARD/src/employee/uploads/${fileName}`;
+  const baseUrl = (process.env.BACKEND_URL || process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`).replace(/\/+$/, '');
+  const fileUrl = `${baseUrl}/uploads/employee/${fileName}`;
 
   try {
     const [result] = await db.execute(

@@ -23,9 +23,11 @@ const approveQuotation = async (req, res) => {
 
     const quotation = rows[0];
 
-    // Update status to 'Sent'
-    await db.query('UPDATE Quotations SET status = ? WHERE id = ?', ['Sent', id]);
-    quotation.status = 'Sent';
+    const { getRmEmailForEmployee } = require('./quotationHelper');
+
+    // Update status to 'Approved'
+    await db.query('UPDATE Quotations SET status = ? WHERE id = ?', ['Approved', id]);
+    quotation.status = 'Approved';
 
     // Parse items if string
     if (typeof quotation.items === 'string') {
@@ -36,22 +38,26 @@ const approveQuotation = async (req, res) => {
       }
     }
 
-    // Trigger email send
+    // Lookup RM email for CC
+    const rmEmail = await getRmEmailForEmployee(db, quotation.emp_id || quotation.prepared_by);
+
+    // Trigger email send with CC to RM
     let emailResult = { sent: false };
     if (quotation.client_email) {
-      emailResult = await sendQuotationEmail(quotation);
+      emailResult = await sendQuotationEmail(quotation, { cc: rmEmail });
     }
 
     response.success = true;
     response.message = emailResult.sent
-      ? `Quotation ${quotation.quotation_no} approved and sent to ${quotation.client_email}.`
-      : `Quotation ${quotation.quotation_no} approved (Status: Sent).`;
+      ? `Quotation ${quotation.quotation_no} approved and sent to ${quotation.client_email}${rmEmail ? ` (CC: ${rmEmail})` : ''}.`
+      : `Quotation ${quotation.quotation_no} approved (Status: Approved).`;
     response.data = {
       id,
       quotation_no: quotation.quotation_no,
-      status: 'Sent',
+      status: 'Approved',
       email_sent: emailResult.sent,
-      email_recipient: quotation.client_email || null
+      email_recipient: quotation.client_email || null,
+      cc_recipient: rmEmail || null
     };
 
     return res.json(response);

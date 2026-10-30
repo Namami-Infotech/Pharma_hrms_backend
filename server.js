@@ -15,6 +15,8 @@ const uploadDirs = [
   path.join(__dirname, 'uploads'),
   path.join(__dirname, 'uploads/employee'),
   path.join(__dirname, 'uploads/attendance'),
+  path.join(__dirname, 'uploads/expenses'),
+  path.join(__dirname, 'uploads/policies'),
   path.join(__dirname, 'assets')
 ];
 uploadDirs.forEach(dir => {
@@ -41,6 +43,17 @@ app.use('/employee/uploads', express.static(path.join(__dirname, 'uploads/employ
 app.use('/src/employee/uploads', express.static(path.join(__dirname, 'uploads/employee')));
 app.use('/attendance/uploads', express.static(path.join(__dirname, 'uploads/attendance')));
 app.use('/src/attendance/uploads', express.static(path.join(__dirname, 'uploads/attendance')));
+app.use('/expenses/uploads', express.static(path.join(__dirname, 'uploads/expenses')));
+app.use('/src/expenses/uploads', express.static(path.join(__dirname, 'uploads/expenses')));
+
+// Support legacy SAFEGUARD static paths
+app.use('/SAFEGUARD/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/SAFEGUARD/employee/uploads', express.static(path.join(__dirname, 'uploads/employee')));
+app.use('/SAFEGUARD/src/employee/uploads', express.static(path.join(__dirname, 'uploads/employee')));
+app.use('/SAFEGUARD/attendance/uploads', express.static(path.join(__dirname, 'uploads/attendance')));
+app.use('/SAFEGUARD/src/attendance/uploads', express.static(path.join(__dirname, 'uploads/attendance')));
+app.use('/SAFEGUARD/expenses/uploads', express.static(path.join(__dirname, 'uploads/expenses')));
+app.use('/SAFEGUARD/src/expenses/uploads', express.static(path.join(__dirname, 'uploads/expenses')));
 
 // Health check / Welcome
 app.get('/health', (req, res) => {

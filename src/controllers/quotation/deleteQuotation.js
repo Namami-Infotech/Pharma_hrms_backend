@@ -10,11 +10,20 @@ const deleteQuotation = async (req, res) => {
   }
 
   try {
-    const [result] = await db.query('DELETE FROM Quotations WHERE id = ?', [id]);
-    if (result.affectedRows === 0) {
+    const [existing] = await db.query('SELECT id, status, quotation_no FROM Quotations WHERE id = ? LIMIT 1', [id]);
+    if (!existing || existing.length === 0) {
       response.message = 'Quotation not found or already deleted.';
       return res.status(404).json(response);
     }
+
+    const currentStatus = existing[0].status;
+    const isLocked = ['Sent', 'Approved', 'Pending Approval', 'Pending'].includes(currentStatus);
+    if (isLocked) {
+      response.message = 'Quotation cannot be deleted once it has been sent or submitted for approval.';
+      return res.status(400).json(response);
+    }
+
+    const [result] = await db.query('DELETE FROM Quotations WHERE id = ?', [id]);
 
     response.success = true;
     response.message = 'Quotation deleted successfully.';

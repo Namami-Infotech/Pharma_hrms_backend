@@ -96,20 +96,12 @@ const createQuotation = async (req, res) => {
       validUntil = v.toISOString().slice(0, 10);
     }
 
-    // 3. Dynamic Approval Threshold Check
-    let approvalThreshold = 35000;
-    try {
-      const [settingRows] = await db.query(
-        "SELECT setting_value FROM settings WHERE setting_key = 'quotation_approval_threshold' LIMIT 1"
-      );
-      if (settingRows && settingRows.length > 0 && !isNaN(parseFloat(settingRows[0].setting_value))) {
-        approvalThreshold = parseFloat(settingRows[0].setting_value);
-      }
-    } catch (settErr) {
-      console.warn('Error reading approval threshold from settings:', settErr.message);
-    }
+    // 3. Discount Approval Threshold Check (Discount > 35% requires RM approval)
+    const { checkDiscountRequiresApproval, getRmEmailForEmployee } = require('./quotationHelper');
+    const empIdentifier = data.emp_id || data.EmpId || req.user?.EmpId || req.user?.emp_id || data.prepared_by;
+    const rmEmail = await getRmEmailForEmployee(db, empIdentifier);
 
-    const requiresApproval = totalAmount > approvalThreshold;
+    const requiresApproval = checkDiscountRequiresApproval(formattedItems, discountPercent);
     const initialStatus = requiresApproval ? 'Pending Approval' : (data.status || 'Sent');
 
     const defaultTerms = 
@@ -124,8 +116,8 @@ const createQuotation = async (req, res) => {
         quotation_no, quotation_date, valid_until, client_name, client_email, client_phone,
         client_address, client_gst, subject, items, subtotal, discount_percent, discount_amount,
         tax_type, tax_percent, tax_amount, total_amount, status, terms_conditions, notes,
-        prepared_by, Tenent_Id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        prepared_by, emp_id, Tenent_Id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const clientEmail = (data.client_email || '').trim();
@@ -152,10 +144,11 @@ const createQuotation = async (req, res) => {
       data.terms_conditions || defaultTerms,
       data.notes || '',
       data.prepared_by || 'Aberdure Sales Team',
+      empIdentifier ? String(empIdentifier) : null,
       tenantId
     ]);
 
-    // Send email to client if within threshold limit
+    // Send email to client if within 35% discount limit (CC to RM)
     let emailSent = false;
     if (!requiresApproval && clientEmail) {
       const { sendQuotationEmail } = require('./quotationEmail');
@@ -173,16 +166,17 @@ const createQuotation = async (req, res) => {
         tax_amount: taxAmount,
         total_amount: totalAmount,
         terms_conditions: data.terms_conditions || defaultTerms,
-        notes: data.notes || ''
+        notes: data.notes || '',
+        cc: rmEmail
       });
       emailSent = emailResult.sent;
     }
 
     response.success = true;
     if (requiresApproval) {
-      response.message = `Quotation created and sent for approval (Amount ₹${totalAmount.toLocaleString('en-IN')} exceeds limit ₹${approvalThreshold.toLocaleString('en-IN')}).`;
+      response.message = 'Quotation sent for RM approval (Item discount exceeds 35%).';
     } else if (emailSent) {
-      response.message = `Quotation created and sent to client email (${clientEmail}).`;
+      response.message = `Quotation created and sent to ${clientEmail}${rmEmail ? ` (CC: ${rmEmail})` : ''}.`;
     } else {
       response.message = 'Quotation created successfully.';
     }
@@ -193,7 +187,8 @@ const createQuotation = async (req, res) => {
       total_amount: totalAmount,
       status: initialStatus,
       requires_approval: requiresApproval,
-      email_sent: emailSent
+      email_sent: emailSent,
+      rm_email: rmEmail
     };
 
     return res.json(response);

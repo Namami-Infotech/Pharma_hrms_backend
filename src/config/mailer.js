@@ -15,12 +15,16 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-async function sendMail({ to, subject, html, text, from }) {
-  const fromEmail = (process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'communications@namami-infotech.com').trim();
-  const fromName = process.env.SMTP_FROM_NAME || 'SAFEGUARD HR';
+async function sendMail({ to, cc, bcc, subject, html, text, from, replyTo, attachments }) {
+  const fromEmail = (process.env.SMTP_FROM_EMAIL || 'info@aberdurepharma.com').trim();
+  const fromName = process.env.SMTP_FROM_NAME || 'M/S ABERDURE PHARMA';
   const mailOptions = {
     from: from || `"${fromName}" <${fromEmail}>`,
     to,
+    ...(cc && { cc }),
+    ...(bcc && { bcc }),
+    ...(replyTo && { replyTo }),
+    ...(attachments && { attachments }),
     subject,
     html,
     text

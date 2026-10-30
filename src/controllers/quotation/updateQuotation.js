@@ -24,15 +24,18 @@ const updateQuotation = async (req, res) => {
       await db.query('UPDATE Quotations SET status = ? WHERE id = ?', [data.status, id]);
       
       let emailSent = false;
-      if (data.status === 'Sent' && current.status === 'Pending Approval' && current.client_email) {
+      if (['Sent', 'Approved'].includes(data.status) && current.client_email) {
         const { sendQuotationEmail } = require('./quotationEmail');
+        const { getRmEmailForEmployee } = require('./quotationHelper');
+        const rmEmail = await getRmEmailForEmployee(db, current.emp_id || current.prepared_by);
         let parsedItems = [];
         try {
           parsedItems = typeof current.items === 'string' ? JSON.parse(current.items) : (current.items || []);
         } catch (_) {}
         const emailResult = await sendQuotationEmail({
           ...current,
-          items: parsedItems
+          items: parsedItems,
+          cc: rmEmail
         });
         emailSent = emailResult.sent;
       }
@@ -42,6 +45,13 @@ const updateQuotation = async (req, res) => {
         ? `Status updated to ${data.status} and quotation emailed to ${current.client_email}.`
         : `Status updated to ${data.status}.`;
       return res.json(response);
+    }
+
+    // Block full edit if quotation has already been sent or submitted for approval
+    const isLocked = ['Sent', 'Approved', 'Pending Approval', 'Pending'].includes(current.status);
+    if (isLocked) {
+      response.message = 'Quotation cannot be edited once it has been sent or submitted for approval.';
+      return res.status(400).json(response);
     }
 
     // Full update with recalculation

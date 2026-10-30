@@ -4,13 +4,14 @@ const { COMPANY_DETAILS } = require('./quotationHelper');
 /**
  * Send quotation email to client with rich Aberdure Pharma branding
  */
-async function sendQuotationEmail(quotation) {
+async function sendQuotationEmail(quotation, options = {}) {
   if (!quotation || !quotation.client_email) {
     console.warn('[Quotation Email] Skipped: No client email provided.');
     return { sent: false, reason: 'No client email provided' };
   }
 
   const comp = COMPANY_DETAILS;
+  const ccEmail = options.cc || quotation.cc || quotation.rm_email || null;
   const items = Array.isArray(quotation.items) 
     ? quotation.items 
     : (typeof quotation.items === 'string' ? JSON.parse(quotation.items || '[]') : []);
@@ -148,14 +149,17 @@ async function sendQuotationEmail(quotation) {
 
   try {
     const info = await sendMail({
+      from: `"${comp.name}" <${comp.email}>`,
+      replyTo: comp.email,
       to: quotation.client_email,
+      ...(ccEmail ? { cc: ccEmail } : {}),
       subject: `Quotation ${quotation.quotation_no} - ${comp.name}`,
       html,
       text: `Quotation ${quotation.quotation_no} for ${quotation.client_name}. Grand Total: ₹${quotation.total_amount}. Valid Until: ${quotation.valid_until}`
     });
 
-    console.log(`[Quotation Email] Sent successfully to ${quotation.client_email}. MessageId: ${info.messageId}`);
-    return { sent: true, messageId: info.messageId };
+    console.log(`[Quotation Email] Sent successfully to ${quotation.client_email}${ccEmail ? ` (CC: ${ccEmail})` : ''}. MessageId: ${info.messageId}`);
+    return { sent: true, messageId: info.messageId, cc: ccEmail };
   } catch (err) {
     console.error(`[Quotation Email] Failed sending to ${quotation.client_email}:`, err.message);
     return { sent: false, error: err.message };

@@ -5,13 +5,11 @@ const uploadPolicy = (req, res, next) => {
     return res.json({ success: false, error: 'No file uploaded or invalid request.' });
   }
 
-  const uploadBaseUrl = process.env.BASE_URL 
-    ? `${process.env.BASE_URL}/uploads/` 
-    : 'https://namami-infotech.com/HR-SMILE-BACKEND/uploads/';
+  const baseUrl = (process.env.BACKEND_URL || process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`).replace(/\/+$/, '');
 
   return res.json({
     success: true,
-    fileUrl: uploadBaseUrl + req.file.filename
+    fileUrl: `${baseUrl}/uploads/policies/${req.file.filename}`
   });
 };
 

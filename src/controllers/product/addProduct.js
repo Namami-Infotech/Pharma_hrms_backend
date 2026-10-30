@@ -45,13 +45,6 @@ const addProduct = async (req, res) => {
       });
     }
 
-    if (!packaging || !packaging.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Packaging (e.g. 10x10 Tablets, 100ml Bottle) is required'
-      });
-    }
-
     if (price === undefined || price === null || isNaN(parseFloat(price)) || parseFloat(price) < 0) {
       return res.status(400).json({
         success: false,
@@ -60,6 +53,7 @@ const addProduct = async (req, res) => {
     }
 
     const tenantId = Tenent_Id || 1;
+    const finalPackaging = (packaging && packaging.trim()) ? packaging.trim() : (unit ? unit.trim() : '');
     const finalPrice = Math.round(parseFloat(price) * 100) / 100;
     const finalStatus = status === 'Inactive' ? 'Inactive' : 'Active';
     const finalHsn = (hsn && hsn.trim()) ? hsn.trim() : '3004';
@@ -96,7 +90,7 @@ const addProduct = async (req, res) => {
         finalCode,
         name.trim(),
         unit.trim(),
-        packaging.trim(),
+        finalPackaging,
         finalPrice,
         finalHsn,
         finalCategory,

@@ -43,7 +43,7 @@ const uploadEmployeeImage = multer({
 // Storage for policy PDFs
 const policyStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../../uploads');
+    const uploadDir = path.join(__dirname, '../../uploads/policies');
     ensureDir(uploadDir);
     cb(null, uploadDir);
   },
