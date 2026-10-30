@@ -131,6 +131,13 @@ const editEmployee = async (req, res) => {
     }
 
     // Update leave balances
+    const leaveData = {
+      SL: data.SL !== undefined ? parseFloat(data.SL) : 1,
+      EL: data.EL !== undefined ? parseFloat(data.EL) : 0,
+      CL: data.CL !== undefined ? parseFloat(data.CL) : 0,
+      PL: data.PL !== undefined ? parseFloat(data.PL) : 0,
+    };
+
     const [leaveCheck] = await conn.query(
       'SELECT COUNT(*) as count FROM EmployeeLeave WHERE EmpId = ?',
       [EmpId]
@@ -143,8 +150,8 @@ const editEmployee = async (req, res) => {
       );
     } else {
       await conn.execute(
-        'INSERT INTO EmployeeLeave (EmpId, SL, EL) VALUES (?, ?, ?)',
-        [EmpId, leaveData.SL, leaveData.EL]
+        'INSERT INTO EmployeeLeave (EmpId, SL, EL, Tenent_Id) VALUES (?, ?, ?, ?)',
+        [EmpId, leaveData.SL, leaveData.EL, data.Tenent_Id || 1]
       );
     }
 

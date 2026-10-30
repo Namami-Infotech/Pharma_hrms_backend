@@ -4,6 +4,7 @@ const getLeaves = require('./getLeaves');
 const approveLeave = require('./approveLeave');
 const addCompOff = require('./addCompOff');
 const addPL = require('./addPL');
+const updateLeaveBalance = require('./updateLeaveBalance');
 const { getDayDiffInclusive } = require('./leaveHelper');
 
 module.exports = {
@@ -13,5 +14,6 @@ module.exports = {
   approveLeave,
   addCompOff,
   addPL,
+  updateLeaveBalance,
   getDayDiffInclusive
 };

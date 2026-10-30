@@ -10,14 +10,16 @@ const getVisitsEntry = async (req, res) => {
     let sql = '';
     const params = [];
 
-    if (role === 'HR') {
+    const isAdmin = ['Admin', 'admin', 'SuperAdmin'].includes(role);
+
+    if (isAdmin) {
       sql = 'SELECT * FROM Visits';
     } else if (empId) {
-      sql = 'SELECT * FROM Visits WHERE EmpId = ?';
-      params.push(empId);
+      sql = `SELECT * FROM Visits 
+             WHERE EmpId = ? OR EmpId IN (SELECT EmpId FROM Employees WHERE RM = ? OR RM = (SELECT Name FROM Employees WHERE EmpId = ? LIMIT 1))`;
+      params.push(empId, empId, empId);
     } else {
-      response.message = 'EmpId or role is required.';
-      return res.json(response);
+      sql = 'SELECT * FROM Visits';
     }
 
     const [visits] = await db.query(sql, params);

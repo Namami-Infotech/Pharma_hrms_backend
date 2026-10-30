@@ -14,16 +14,19 @@ const getExpense = async (req, res) => {
     let sql = '';
     const params = [];
 
-    const isHrOrAdmin = ['HR', 'Admin', 'admin', 'SuperAdmin', 'MANAGER'].includes(role) ||
-      (typeof role === 'string' && (role.toLowerCase().includes('admin') || role.toLowerCase().includes('hr')));
+    const isAdmin = ['Admin', 'admin', 'SuperAdmin'].includes(role) ||
+      (typeof role === 'string' && role.toLowerCase().includes('admin'));
 
-    if (isHrOrAdmin) {
+    if (isAdmin) {
       sql = `SELECT detailId, batchId, empId, expenseDate, expenseType, expenseAmount, image, Status 
              FROM ExpenseDetails ORDER BY expenseDate DESC`;
     } else {
+      // RM can view their own expenses AND expenses of employees reporting to them
       sql = `SELECT detailId, batchId, empId, expenseDate, expenseType, expenseAmount, image, Status 
-             FROM ExpenseDetails WHERE empId = ? ORDER BY expenseDate DESC`;
-      params.push(empId);
+             FROM ExpenseDetails 
+             WHERE empId = ? OR empId IN (SELECT EmpId FROM Employees WHERE RM = ? OR RM = (SELECT Name FROM Employees WHERE EmpId = ? LIMIT 1))
+             ORDER BY expenseDate DESC`;
+      params.push(empId, empId, empId);
     }
 
     const [rows] = await db.query(sql, params);

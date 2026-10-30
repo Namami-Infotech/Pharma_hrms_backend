@@ -6,7 +6,10 @@ const getTodayAttendance = async (req, res) => {
   const response = { success: false, message: '', data: [] };
 
   try {
-    let inputDate = (req.query.date || '').toString().trim();
+    let inputDate = (req.query.date || req.body?.date || '').toString().trim();
+    const role = req.query.role || req.body?.role || null;
+    const empIdParam = req.query.EmpId || req.query.empId || req.query.empid || req.body?.EmpId || req.body?.empId || req.body?.empid || null;
+    const isRM = req.query.is_rm === 'true' || req.query.isRM === 'true' || req.body?.is_rm === 'true' || req.body?.isRM === 'true';
 
     if (inputDate && isNaN(new Date(inputDate).getTime())) {
       response.message = 'Invalid date format. Use YYYY-MM-DD.';
@@ -17,15 +20,41 @@ const getTodayAttendance = async (req, res) => {
       inputDate = new Date().toISOString().slice(0, 10);
     }
 
-    const [empRows] = await db.query(
-      `SELECT DISTINCT EmpId FROM (
+    const isAdmin = ['Admin', 'admin', 'SuperAdmin'].includes(role);
+
+    let querySql = `
+      SELECT DISTINCT EmpId FROM (
          SELECT EmpId FROM Activity WHERE (DATE(MobileDateTime) = ? OR Date = ?)
          UNION
          SELECT EmpId FROM Attendance WHERE (Date = ? OR DateTime = ?)
-       ) AS combined_emps 
-       ORDER BY EmpId ASC`,
-      [inputDate, inputDate, inputDate, inputDate]
-    );
+      ) AS combined_emps
+    `;
+    let queryParams = [inputDate, inputDate, inputDate, inputDate];
+
+    if (!isAdmin && empIdParam) {
+      // Find subordinate IDs if user is an RM
+      const [subRows] = await db.query(
+        'SELECT EmpId FROM Employees WHERE RM = ? OR RM = (SELECT Name FROM Employees WHERE EmpId = ? LIMIT 1)',
+        [empIdParam, empIdParam]
+      );
+      const isActualRM = isRM || (subRows && subRows.length > 0);
+      const allowedEmpIds = [empIdParam];
+      if (isActualRM && subRows && subRows.length > 0) {
+        subRows.forEach(r => {
+          if (r.EmpId && !allowedEmpIds.includes(r.EmpId)) {
+            allowedEmpIds.push(r.EmpId);
+          }
+        });
+      }
+
+      const placeholders = allowedEmpIds.map(() => '?').join(',');
+      querySql += ` WHERE EmpId IN (${placeholders})`;
+      queryParams.push(...allowedEmpIds);
+    }
+
+    querySql += ` ORDER BY EmpId ASC`;
+
+    const [empRows] = await db.query(querySql, queryParams);
 
     if (empRows && empRows.length > 0) {
       response.success = true;

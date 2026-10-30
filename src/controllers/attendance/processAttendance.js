@@ -4,10 +4,10 @@ const { OFFICE_LAT, OFFICE_LON, calculateDistance, formatTimeAMPM, formatDateDDM
 
 const processAttendance = async (req, res) => {
   const response = { success: false, message: '', data: [] };
-  const role = req.query.role || null;
+  const isAdmin = ['Admin', 'admin', 'SuperAdmin'].includes(role);
 
-  if (role !== 'HR') {
-    response.message = 'Unauthorized access. Only HR can perform this action.';
+  if (!isAdmin) {
+    response.message = 'Unauthorized access. Only Admin can perform this action.';
     return res.json(response);
   }
 

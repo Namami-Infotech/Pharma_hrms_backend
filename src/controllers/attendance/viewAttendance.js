@@ -11,15 +11,25 @@ const viewAttendance = async (req, res) => {
     let sql = '';
     const params = [];
 
-    const isHrOrAdmin = role === 'HR' || role === 'Admin' || role === 'admin' || role === 'SuperAdmin';
+    const isAdmin = role === 'Admin' || role === 'admin' || role === 'SuperAdmin';
+    const isRM = req.query.is_rm === 'true' || req.query.isRM === 'true';
+    const rmEmpId = req.query.rmEmpId || (isRM && !empId ? req.query.EmpId : null);
 
     if (empId) {
-      sql = `SELECT * FROM Activity WHERE EmpId = ?`;
-      params.push(empId);
-    } else if (isHrOrAdmin) {
+      if (req.query.includeTeam === 'true') {
+        sql = `SELECT * FROM Activity WHERE EmpId = ? OR EmpId IN (SELECT EmpId FROM Employees WHERE RM = ? OR RM = (SELECT Name FROM Employees WHERE EmpId = ? LIMIT 1))`;
+        params.push(empId, empId, empId);
+      } else {
+        sql = `SELECT * FROM Activity WHERE EmpId = ?`;
+        params.push(empId);
+      }
+    } else if (isAdmin) {
       sql = `SELECT * FROM Activity`;
+    } else if (rmEmpId) {
+      sql = `SELECT * FROM Activity WHERE EmpId = ? OR EmpId IN (SELECT EmpId FROM Employees WHERE RM = ? OR RM = (SELECT Name FROM Employees WHERE EmpId = ? LIMIT 1))`;
+      params.push(rmEmpId, rmEmpId, rmEmpId);
     } else {
-      response.message = 'EmpId parameter is missing for non-HR role.';
+      response.message = 'EmpId parameter is missing for non-Admin role.';
       return res.json(response);
     }
 
@@ -40,8 +50,18 @@ const viewAttendance = async (req, res) => {
     let attSql = 'SELECT * FROM Attendance';
     const attParams = [];
     if (empId) {
-      attSql += ' WHERE EmpId = ?';
-      attParams.push(empId);
+      if (req.query.includeTeam === 'true') {
+        attSql += ' WHERE EmpId = ? OR EmpId IN (SELECT EmpId FROM Employees WHERE RM = ? OR RM = (SELECT Name FROM Employees WHERE EmpId = ? LIMIT 1))';
+        attParams.push(empId, empId, empId);
+      } else {
+        attSql += ' WHERE EmpId = ?';
+        attParams.push(empId);
+      }
+    } else if (isAdmin) {
+      // All attendance records
+    } else if (rmEmpId) {
+      attSql += ' WHERE EmpId = ? OR EmpId IN (SELECT EmpId FROM Employees WHERE RM = ? OR RM = (SELECT Name FROM Employees WHERE EmpId = ? LIMIT 1))';
+      attParams.push(rmEmpId, rmEmpId, rmEmpId);
     }
     let attData = [];
     try {

@@ -9,15 +9,20 @@ const getTravel = async (req, res) => {
     let sql = '';
     const params = [];
 
-    if (role === 'HR') {
+    const isAdmin = ['Admin', 'admin', 'SuperAdmin'].includes(role) ||
+      (typeof role === 'string' && role.toLowerCase().includes('admin'));
+
+    if (isAdmin) {
       sql = 'SELECT * FROM TravelExpenses';
     } else {
       if (!empId) {
-        response.message = 'empId parameter is required for non-HR roles.';
+        response.message = 'empId parameter is required for non-Admin roles.';
         return res.json(response);
       }
-      sql = 'SELECT * FROM TravelExpenses WHERE empId = ?';
-      params.push(empId);
+      // RM can access their own travel expenses AND travel expenses of employees under their RM
+      sql = `SELECT * FROM TravelExpenses 
+             WHERE empId = ? OR empId IN (SELECT EmpId FROM Employees WHERE RM = ? OR RM = (SELECT Name FROM Employees WHERE EmpId = ? LIMIT 1))`;
+      params.push(empId, empId, empId);
     }
 
     const [rows] = await db.query(sql, params);

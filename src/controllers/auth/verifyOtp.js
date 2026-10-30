@@ -98,6 +98,25 @@ const verifyOtp = async (req, res) => {
       const menu = await getMenuByTenent(employee.Tenent_Id);
       const { moduleIds, moduleList, modulesDetail } = await getActiveRoleModules();
 
+      // Check if this employee is a Reporting Manager (RM) for other employees
+      let subordinates = [];
+      try {
+        const [subRows] = await db.query(
+          'SELECT EmpId, Name, EmailId, Designation, Mobile, Pic FROM Employees WHERE (RM = ? OR RM = ?) AND IsActive = 1',
+          [employee.EmpId, employee.Name]
+        );
+        subordinates = subRows || [];
+      } catch (rmErr) {
+        console.warn('Could not query subordinates for RM:', rmErr.message);
+      }
+
+      const isRM = subordinates.length > 0;
+      const subordinateIds = isRM ? subordinates.map((s) => s.EmpId) : [];
+
+      const isAdmin = ['Admin', 'SuperAdmin', 'Super Admin'].includes((employee.Role || '').trim()) ||
+        ['Admin', 'SuperAdmin', 'Super Admin'].includes((employee.Designation || '').trim());
+      const effectiveRole = isAdmin ? 'Admin' : 'Employee';
+
       response.success = true;
       response.message = 'Login successful';
       response.data = {
@@ -105,8 +124,12 @@ const verifyOtp = async (req, res) => {
         image: employee.Pic || employee.Image,
         username: employee.Name,
         email: employee.EmailId,
-        role: employee.Role,
+        role: effectiveRole,
         rm: employee.RM,
+        is_rm: isRM,
+        isRM: isRM,
+        subordinates: subordinateIds,
+        subordinate_employees: subordinates,
         designation: employee.Designation,
         shift: employee.Shift,
         ResetTime: employee.ResetTime || '06:00:00',

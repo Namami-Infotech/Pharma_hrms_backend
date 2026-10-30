@@ -67,11 +67,25 @@ const login = async (req, res) => {
     const tenantId = employee.Tenent_Id || employee.Tenent_ID || employee.tenent_id || 1;
     const tenantMenu = await getMenuByTenent(tenantId);
 
-    // Resolve effective role (fallback to Designation if Role is blank, default to Employee)
-    const effectiveRole = (employee.Role && employee.Role.trim()) ||
-      (employee.Designation && ['Admin', 'SuperAdmin', 'Super Admin', 'Sales', 'Employee'].includes(employee.Designation.trim())
-        ? employee.Designation.trim()
-        : 'Employee');
+    // Check if this employee is a Reporting Manager (RM) for other employees
+    let subordinates = [];
+    try {
+      const [subRows] = await db.query(
+        'SELECT EmpId, Name, EmailId, Designation, Mobile, Pic FROM Employees WHERE (RM = ? OR RM = ?) AND IsActive = 1',
+        [employee.EmpId, employee.Name]
+      );
+      subordinates = subRows || [];
+    } catch (rmErr) {
+      console.warn('Could not query subordinates for RM:', rmErr.message);
+    }
+
+    const isRM = subordinates.length > 0;
+    const subordinateIds = isRM ? subordinates.map((s) => s.EmpId) : [];
+
+    // System only supports 2 roles: Admin and Employee
+    const isAdmin = ['Admin', 'SuperAdmin', 'Super Admin'].includes((employee.Role || '').trim()) ||
+      ['Admin', 'SuperAdmin', 'Super Admin'].includes((employee.Designation || '').trim());
+    const effectiveRole = isAdmin ? 'Admin' : 'Employee';
 
     // Fetch all active modules dynamically from database (only is_active = 1, no role validation)
     const { moduleIds } = await getActiveRoleModules();
@@ -85,6 +99,10 @@ const login = async (req, res) => {
       email: employee.EmailId,
       role: effectiveRole,
       rm: employee.RM,
+      is_rm: isRM,
+      isRM: isRM,
+      subordinates: subordinateIds,
+      subordinate_employees: subordinates,
       designation: employee.Designation,
       tenent_id: employee.Tenent_Id,
       shift: employee.Shift,

@@ -10,19 +10,20 @@ const getLeaves = async (req, res) => {
     let sql = '';
     const params = [];
 
-    const isHrOrAdmin = ['HR', 'Admin', 'admin', 'SuperAdmin'].includes(role);
+    const isAdmin = ['Admin', 'admin', 'SuperAdmin'].includes(role);
     const conditions = [];
 
-    if (isHrOrAdmin) {
+    if (isAdmin) {
       if (empId) {
         conditions.push('EmpId = ?');
         params.push(empId);
       }
     } else if (empId) {
-      conditions.push('EmpId = ?');
-      params.push(empId);
+      // RM can access their own leave requests AND leaves of employees under their RM
+      conditions.push('(EmpId = ? OR EmpId IN (SELECT EmpId FROM Employees WHERE RM = ? OR RM = (SELECT Name FROM Employees WHERE EmpId = ? LIMIT 1)))');
+      params.push(empId, empId, empId);
     } else {
-      response.message = 'Either empId or HR/Admin role must be provided.';
+      response.message = 'Either empId or Admin role must be provided.';
       return res.json(response);
     }
 
@@ -35,8 +36,15 @@ const getLeaves = async (req, res) => {
     const [rows] = await db.query(sql, params);
 
     if (rows && rows.length > 0) {
+      const normalizedRows = rows.map(r => ({
+        ...r,
+        Id: r.id || r.Id,
+        id: r.id || r.Id,
+        Category: r.category || r.Category || r.LeaveType || 'Leave',
+        category: r.category || r.Category || r.LeaveType || 'Leave',
+      }));
       response.success = true;
-      response.data = rows;
+      response.data = normalizedRows;
     } else {
       response.message = 'No tickets found.';
     }

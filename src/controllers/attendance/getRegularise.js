@@ -16,11 +16,16 @@ const getRegularise = async (req, res) => {
     let sql = '';
     const params = [];
 
-    if (role === 'HR') {
+    const isAdmin = ['Admin', 'admin', 'SuperAdmin'].includes(role);
+
+    if (isAdmin) {
       sql = 'SELECT * FROM Regularisation ORDER BY Date DESC';
     } else {
-      sql = 'SELECT * FROM Regularisation WHERE EmpId = ? ORDER BY Date DESC';
-      params.push(empId);
+      // RM can access their own regularisation records AND records of employees under their RM
+      sql = `SELECT * FROM Regularisation 
+             WHERE EmpId = ? OR EmpId IN (SELECT EmpId FROM Employees WHERE RM = ? OR RM = (SELECT Name FROM Employees WHERE EmpId = ? LIMIT 1))
+             ORDER BY Date DESC`;
+      params.push(empId, empId, empId);
     }
 
     const [rows] = await db.query(sql, params);

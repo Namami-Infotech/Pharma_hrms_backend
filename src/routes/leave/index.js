@@ -23,4 +23,7 @@ router.post(['/add_comp_off.php', '/add_comp_off'], leaveController.addCompOff);
 // POST /leave/add_pl.php
 router.post(['/add_pl.php', '/add_pl'], leaveController.addPL);
 
+// POST /leave/update_balance.php (and /update_balance)
+router.post(['/update_balance.php', '/update_balance', '/update_leave_balance.php', '/update_leave_balance'], leaveController.updateLeaveBalance);
+
 module.exports = router;

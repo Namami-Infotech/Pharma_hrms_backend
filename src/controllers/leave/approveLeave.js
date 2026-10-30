@@ -5,8 +5,11 @@ const approveLeave = async (req, res) => {
   const response = { success: false, message: '' };
   const data = req.body || {};
 
-  const leaveId = data.id || data.Id || data.leaveId || data.LeaveId || '';
-  const status = data.status || data.Status || '';
+  const leaveId = data.id || data.Id || data.leaveId || data.LeaveId || req.query.id || req.query.Id || req.query.leaveId || req.query.LeaveId || '';
+  const status = data.status || data.Status || req.query.status || req.query.Status || '';
+  const userEmpId = data.userEmpId || data.empId || req.query.userEmpId || req.query.empId || '';
+  const userRole = data.role || req.query.role || '';
+  const isAdmin = ['Admin', 'admin', 'SuperAdmin'].includes(userRole);
 
   if (!leaveId || !status) {
     response.message = 'Please provide leaveId and status.';
@@ -25,6 +28,14 @@ const approveLeave = async (req, res) => {
 
     const leaveData = rows[0];
     const empid = leaveData.EmpId || leaveData.empid;
+
+    // Reporting Managers cannot approve or reject their own leave requests
+    if (!isAdmin && userEmpId && String(empid).trim().toLowerCase() === String(userEmpId).trim().toLowerCase()) {
+      conn.release();
+      response.message = 'Reporting managers cannot approve or reject their own leave requests. It must be approved by Admin.';
+      return res.json(response);
+    }
+
     const category = leaveData.category || leaveData.Category || leaveData.LeaveType;
     const startDate = leaveData.StartDate || leaveData.startDate;
     const endDate = leaveData.EndDate || leaveData.endDate;

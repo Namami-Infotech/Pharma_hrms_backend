@@ -5,7 +5,9 @@ const getTicket = async (req, res, next) => {
     const empId = req.query.EmpId || req.body?.EmpId;
     const role = req.query.role || req.body?.role;
 
-    if (role && role === 'HR') {
+    const isAdmin = ['Admin', 'admin', 'SuperAdmin'].includes(role);
+
+    if (role && isAdmin) {
       const [tickets] = await pool.query('SELECT * FROM Support_Tickets');
       if (tickets.length > 0) {
         return res.json({ success: true, message: '', data: tickets });

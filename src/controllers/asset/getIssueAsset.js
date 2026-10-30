@@ -10,13 +10,15 @@ const getIssueAsset = async (req, res) => {
     let sql = '';
     const params = [];
 
-    if (role === 'HR') {
+    const isAdmin = ['Admin', 'admin', 'SuperAdmin'].includes(role);
+
+    if (isAdmin) {
       sql = 'SELECT * FROM assets_issue';
     } else if (empId) {
       sql = 'SELECT * FROM assets_issue WHERE emp_id = ?';
       params.push(empId);
     } else {
-      response.message = 'EmpId parameter is missing for non-HR role.';
+      response.message = 'EmpId parameter is missing for non-Admin role.';
       return res.json(response);
     }
 

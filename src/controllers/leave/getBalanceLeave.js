@@ -13,8 +13,20 @@ const getBalanceLeave = async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM EmployeeLeave WHERE EmpId = ? ORDER BY id DESC', [empid]);
 
-    if (rows && rows.length > 0) {
-      const data = { ...rows[0] };
+    let leaveRow = rows && rows.length > 0 ? rows[0] : null;
+
+    if (!leaveRow) {
+      // Auto-initialize leave record for this employee if none exists
+      await db.execute(
+        'INSERT INTO EmployeeLeave (EmpId, SL, EL, CompOff, BL, PL, CL, Tenent_Id) VALUES (?, 1, 0, 0, 0, 0, 0, 1)',
+        [empid]
+      );
+      const [newRows] = await db.query('SELECT * FROM EmployeeLeave WHERE EmpId = ? ORDER BY id DESC', [empid]);
+      leaveRow = newRows && newRows.length > 0 ? newRows[0] : null;
+    }
+
+    if (leaveRow) {
+      const data = { ...leaveRow };
       data.HalfDay = 1;
 
       response.TotalLeave = data.TotalLeave ?? data.totalLeave ?? 0;
@@ -22,6 +34,13 @@ const getBalanceLeave = async (req, res) => {
       response.Tenent_Id = data.Tenent_Id ?? data.tenent_id ?? null;
       response.FinancialYear = data.FinancialYear ?? data.financialYear ?? null;
 
+      delete data.id;
+      delete data.EmpId;
+      delete data.empid;
+      delete data.LeaveType;
+      delete data.leaveType;
+      delete data.CompOffDates;
+      delete data.compoffdates;
       delete data.TotalLeave;
       delete data.totalLeave;
       delete data.BalanceLeave;

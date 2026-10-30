@@ -34,13 +34,15 @@ const applyLeave = async (req, res) => {
       }
     }
 
+    const tenantId = data.Tenent_Id || data.tenent_id || 1;
+
     // LWP or HalfDay
     if (category === 'LWP' || category === 'HalfDay') {
       const insertSql = `
-        INSERT INTO Leaves (empid, startDate, endDate, reason, status, category) 
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO Leaves (EmpId, LeaveType, StartDate, EndDate, TotalDays, Reason, Status, category, Tenent_Id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
-      await db.execute(insertSql, [empid, startDate, endDate, reason, status, category]);
+      await db.execute(insertSql, [empid, category, startDate, endDate, days, reason, status, category, tenantId]);
 
       response.success = true;
       response.message =
@@ -61,10 +63,21 @@ const applyLeave = async (req, res) => {
       await conn.beginTransaction();
 
       // Check balance
-      const [rows] = await conn.query(
-        `SELECT \`${category}\` as balance FROM EmployeeLeave WHERE empid = ?`,
+      let [rows] = await conn.query(
+        `SELECT \`${category}\` as balance FROM EmployeeLeave WHERE EmpId = ?`,
         [empid]
       );
+
+      if (!rows || rows.length === 0) {
+        await conn.execute(
+          'INSERT INTO EmployeeLeave (EmpId, SL, EL, CompOff, BL, PL, CL, Tenent_Id) VALUES (?, 1, 0, 0, 0, 0, 0, ?)',
+          [empid, tenantId]
+        );
+        [rows] = await conn.query(
+          `SELECT \`${category}\` as balance FROM EmployeeLeave WHERE EmpId = ?`,
+          [empid]
+        );
+      }
 
       if (!rows || rows.length === 0) {
         conn.release();
@@ -83,14 +96,14 @@ const applyLeave = async (req, res) => {
 
       // Insert leave application
       const insertSql = `
-        INSERT INTO Leaves (empid, startDate, endDate, reason, status, category) 
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO Leaves (EmpId, LeaveType, StartDate, EndDate, TotalDays, Reason, Status, category, Tenent_Id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
-      await conn.execute(insertSql, [empid, startDate, endDate, reason, status, category]);
+      await conn.execute(insertSql, [empid, category, startDate, endDate, days, reason, status, category, tenantId]);
 
       // Deduct balance
       await conn.execute(
-        `UPDATE EmployeeLeave SET \`${category}\` = \`${category}\` - ? WHERE empid = ?`,
+        `UPDATE EmployeeLeave SET \`${category}\` = \`${category}\` - ? WHERE EmpId = ?`,
         [days, empid]
       );
 
