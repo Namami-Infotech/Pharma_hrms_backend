@@ -55,7 +55,8 @@ async function initModuleTables() {
     { id: 20, name: 'Reports', path: '/report', icon: 'Summarize', category: 'Analytics', order: 20, active: 0 }, // Inactive per user request
     { id: 21, name: 'Dashboard', path: '/dashboard', icon: 'Dashboard', category: 'Main', order: 21, active: 1 },
     { id: 22, name: 'Notifications', path: '/notification', icon: 'Notifications', category: 'Main', order: 22, active: 1 },
-    { id: 23, name: 'Maps', path: '/maps', icon: 'Map', category: 'Field', order: 23, active: 0 } // Inactive per user request
+    { id: 23, name: 'Maps', path: '/maps', icon: 'Map', category: 'Field', order: 23, active: 0 }, // Inactive per user request
+    { id: 24, name: 'Advance', path: '/advance', icon: 'AccountBalanceWallet', category: 'Finance', order: 24, active: 1 }
   ];
 
   for (const m of allModules) {
@@ -77,11 +78,11 @@ async function initModuleTables() {
   const defaultRoles = [
     {
       role: 'Admin',
-      modules: '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23'
+      modules: '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24'
     },
     {
       role: 'SuperAdmin',
-      modules: '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23'
+      modules: '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24'
     },
     {
       role: 'Sales',
@@ -89,7 +90,7 @@ async function initModuleTables() {
     },
     {
       role: 'Employee',
-      modules: '1,2,3,6,8,9,10,14,21,22'
+      modules: '1,2,3,6,8,9,10,14,21,22,24'
     }
   ];
 

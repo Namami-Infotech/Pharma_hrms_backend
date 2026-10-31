@@ -164,18 +164,35 @@ const getSalarySlip = async (req, res) => {
     const actualEarningsTotal = actualBasic + actualHra + actualConv + actualSpecialAllow + actualGwrInc + actualPerformanceBonus;
     const grossPay = actualEarningsTotal;
 
+    // Query approved advance payments for this employee for this specific month & year
+    let approvedAdvance = 0;
+    try {
+      const [advRows] = await db.query(
+        `SELECT SUM(amount) AS totalAdvance 
+         FROM advance_requests 
+         WHERE EmpId = ? AND deduction_month = ? AND deduction_year = ? AND status = 'Approved'`,
+        [emp.EmpId, monthNumber, year]
+      );
+      if (advRows && advRows.length > 0 && advRows[0].totalAdvance !== null) {
+        approvedAdvance = parseFloat(advRows[0].totalAdvance) || 0;
+      }
+    } catch (advErr) {
+      console.warn('Error fetching approved advance for salary slip:', advErr.message);
+    }
+
     // Deductions (Pro-rated by days and capped at grossPay)
     const esi = parseFloat(emp.esi_deduction) || (record ? parseFloat(record.esi) : 0);
     const pf = parseFloat(emp.pf_deduction) || (record ? parseFloat(record.epf) : 0);
     const lwf = parseFloat(emp.lwf) || 0;
     const tds = parseFloat(emp.tds) || 0;
-    const advance = parseFloat(emp.advance) || 0;
+    const advance = approvedAdvance > 0 ? approvedAdvance : (parseFloat(emp.advance) || 0);
 
     const actualPf = Math.min(grossPay, Math.round(pf * dayRatio));
     const actualEsi = Math.min(grossPay, Math.round(esi * dayRatio));
     const actualLwf = Math.min(grossPay, Math.round(lwf * dayRatio));
     const actualTds = Math.min(grossPay, Math.round(tds * dayRatio));
-    const actualAdvance = Math.min(grossPay, Math.round(advance * dayRatio));
+    // When an advance payment is approved for this month, deduct the approved advance amount
+    const actualAdvance = Math.min(grossPay, approvedAdvance > 0 ? Math.round(approvedAdvance) : Math.round(advance * dayRatio));
 
     const grossDed = Math.min(grossPay, actualPf + actualEsi + actualLwf + actualTds + actualAdvance);
     const reimbursement = 0;
