@@ -101,7 +101,17 @@ const createQuotation = async (req, res) => {
     const empIdentifier = data.emp_id || data.EmpId || req.user?.EmpId || req.user?.emp_id || data.prepared_by;
     const rmEmail = await getRmEmailForEmployee(db, empIdentifier);
 
-    const requiresApproval = checkDiscountRequiresApproval(formattedItems, discountPercent);
+    let thresholdPercent = 35;
+    try {
+      const [settingsRows] = await db.query(
+        "SELECT setting_value FROM settings WHERE setting_key = 'quotation_approval_threshold' LIMIT 1"
+      );
+      if (settingsRows && settingsRows.length > 0) {
+        thresholdPercent = parseFloat(settingsRows[0].setting_value) || 35;
+      }
+    } catch (_) {}
+
+    const requiresApproval = checkDiscountRequiresApproval(formattedItems, discountPercent, thresholdPercent);
     const initialStatus = requiresApproval ? 'Pending Approval' : (data.status || 'Sent');
 
     const defaultTerms = 

@@ -33,9 +33,9 @@ const numberToWords = (num) => {
 };
 
 /**
- * Checks if any item has discount > 35%, or overall discount > 35%
+ * Checks if any item has discount > thresholdLimit (default 35%), or overall discount > thresholdLimit
  */
-const checkDiscountRequiresApproval = (items = [], overallDiscount = 0) => {
+const checkDiscountRequiresApproval = (items = [], overallDiscount = 0, thresholdLimit = 35) => {
   let parsed = [];
   try {
     parsed = Array.isArray(items) ? items : (typeof items === 'string' ? JSON.parse(items || '[]') : []);
@@ -43,12 +43,14 @@ const checkDiscountRequiresApproval = (items = [], overallDiscount = 0) => {
     parsed = [];
   }
 
+  const limit = parseFloat(thresholdLimit) || 35;
+
   const hasItemAboveLimit = parsed.some((it) => {
     const disc = parseFloat(it.discount) || 0;
-    return disc > 35;
+    return disc > limit;
   });
 
-  const hasOverallAboveLimit = (parseFloat(overallDiscount) || 0) > 35;
+  const hasOverallAboveLimit = (parseFloat(overallDiscount) || 0) > limit;
 
   return hasItemAboveLimit || hasOverallAboveLimit;
 };

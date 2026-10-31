@@ -14,10 +14,10 @@ async function setupSettingsTable() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // Insert default quotation_approval_threshold = 35000 if not exists
+    // Insert default quotation_approval_threshold = 35 if not exists
     await db.query(`
       INSERT INTO settings (setting_key, setting_value, description)
-      VALUES ('quotation_approval_threshold', '35000', 'Quotation amount threshold above which approval is required before sending email')
+      VALUES ('quotation_approval_threshold', '35', 'Discount percentage threshold above which RM approval is required (default 35%)')
       ON DUPLICATE KEY UPDATE setting_key = setting_key;
     `);
 
