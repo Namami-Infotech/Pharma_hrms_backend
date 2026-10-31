@@ -6,25 +6,17 @@ const updateRegularise = async (req, res) => {
   const response = { success: false, message: '' };
   const data = req.body || {};
 
-  const RegID = data.RegID ? data.RegID.toString().trim() : null;
+  const rawId = data.RegID || data.id || data.Id;
+  const RegID = rawId ? rawId.toString().trim() : null;
   const Status = data.Status ? data.Status.toString().trim() : null;
-  const UpdatedBy = data.UpdatedBy ? data.UpdatedBy.toString().trim() : null;
-  const InActivityId = data.InActivityId ? data.InActivityId.toString().trim() : null;
-  const OutActivityId = data.OutActivityId ? data.OutActivityId.toString().trim() : null;
-  const inputDate = data.Date ? data.Date.toString().trim() : null;
-  const inTimeStr = data.InTime ? data.InTime.toString().trim() : '';
-  const outTimeStr = data.OutTime ? data.OutTime.toString().trim() : '';
+  const UpdatedBy = data.UpdatedBy ? data.UpdatedBy.toString().trim() : 'ADMIN';
+  const InActivityId = data.InActivityId ? data.InActivityId.toString().trim() : 'N/A';
+  const OutActivityId = data.OutActivityId ? data.OutActivityId.toString().trim() : (data.InActivityId ? data.InActivityId.toString().trim() : 'N/A');
+  const inputDate = data.Date ? data.Date.toString().trim() : new Date().toISOString().split('T')[0];
+  const inTimeStr = data.InTime ? data.InTime.toString().trim() : '09:00:00';
+  const outTimeStr = data.OutTime ? data.OutTime.toString().trim() : '18:00:00';
 
-  if (
-    !RegID ||
-    !Status ||
-    !UpdatedBy ||
-    !InActivityId ||
-    !OutActivityId ||
-    !inTimeStr ||
-    !outTimeStr ||
-    !inputDate
-  ) {
+  if (!RegID || !Status) {
     response.message = 'Missing required fields.';
     return res.json(response);
   }
@@ -76,9 +68,9 @@ const updateRegularise = async (req, res) => {
 
     await conn.execute(
       `UPDATE Regularisation 
-       SET Status = ?, UpdateDate = ?, UpdatedBy = ? 
-       WHERE RegID = ?`,
-      [Status, UpdateDate, UpdatedBy, RegID]
+       SET Status = ?, UpdateDate = ?, UpdatedBy = ?, RegID = COALESCE(RegID, ?) 
+       WHERE RegID = ? OR id = ?`,
+      [Status, UpdateDate, UpdatedBy, RegID, RegID, RegID]
     );
 
     await conn.commit();
