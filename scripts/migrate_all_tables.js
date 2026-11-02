@@ -101,7 +101,7 @@ const TABLES_MIGRATIONS = [
       \`Mode\` VARCHAR(50) DEFAULT NULL,
       \`Purpose\` VARCHAR(255) DEFAULT NULL,
       \`Remarks\` TEXT DEFAULT NULL,
-      \`Attachment\` VARCHAR(255) DEFAULT NULL,
+      \`Attachment\` LONGTEXT DEFAULT NULL,
       \`old_visit\` INT DEFAULT NULL,
       \`LatLong\` VARCHAR(100) DEFAULT NULL,
       \`Tenent_Id\` INT DEFAULT 1,
