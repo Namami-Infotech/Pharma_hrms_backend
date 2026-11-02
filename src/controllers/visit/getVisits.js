@@ -17,6 +17,7 @@ const getVisits = async (req, res) => {
       SELECT 
         v.VisitID,
         v.EmpId,
+        e.Name as EmpName,
         v.DealerID,
         v.DealerName,
         v.VisitCount,
@@ -35,6 +36,7 @@ const getVisits = async (req, res) => {
         d.LatLong as DealerLatLong
       FROM Visit v
       LEFT JOIN Dealers d ON v.DealerID = d.DealerID
+      LEFT JOIN Employees e ON v.EmpId = e.EmpId
     `;
 
     const conditions = [];
