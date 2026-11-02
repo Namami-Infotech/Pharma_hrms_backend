@@ -20,8 +20,21 @@ const updateQuotation = async (req, res) => {
     const current = existing[0];
 
     // Status quick-update
-    if (data.status && Object.keys(data).length <= 3) {
-      await db.query('UPDATE Quotations SET status = ? WHERE id = ?', [data.status, id]);
+    if (data.status && Object.keys(data).length <= 5) {
+      if (data.status === 'Approved') {
+        const approvedBy = data.approved_by || data.approvedBy || (req.user && (req.user.username || req.user.Name || req.user.EmpId)) || null;
+        try {
+          await db.query('UPDATE Quotations SET status = ?, approved_by = ?, approval_date = CURRENT_TIMESTAMP WHERE id = ?', [data.status, approvedBy, id]);
+        } catch (colErr) {
+          if (colErr.code === 'ER_BAD_FIELD_ERROR') {
+            await db.query('UPDATE Quotations SET status = ? WHERE id = ?', [data.status, id]);
+          } else {
+            throw colErr;
+          }
+        }
+      } else {
+        await db.query('UPDATE Quotations SET status = ? WHERE id = ?', [data.status, id]);
+      }
       
       let emailSent = false;
       if (['Sent', 'Approved'].includes(data.status) && current.client_email) {

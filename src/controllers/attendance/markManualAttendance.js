@@ -150,6 +150,14 @@ const markManualAttendance = async (req, res) => {
     }
 
     await conn.commit();
+
+    try {
+      const { syncAttendance } = require('./syncAttendance');
+      await syncAttendance(db, EmpId, currentDate);
+    } catch (syncErr) {
+      console.warn('Could not sync Attendance after manual entry:', syncErr.message);
+    }
+
     return res.json({
       success: true,
       message: 'Attendance marked successfully',

@@ -20,16 +20,24 @@ const getTodayAttendance = async (req, res) => {
       inputDate = new Date().toISOString().slice(0, 10);
     }
 
+    // Sync latest Activity records into Attendance table for this date
+    try {
+      const { syncAttendance } = require('./syncAttendance');
+      await syncAttendance(db, empIdParam, inputDate);
+    } catch (syncErr) {
+      console.warn('Could not sync Attendance in getTodayAttendance:', syncErr.message);
+    }
+
     const isAdmin = ['Admin', 'admin', 'SuperAdmin'].includes(role);
 
     let querySql = `
       SELECT DISTINCT EmpId FROM (
-         SELECT EmpId FROM Activity WHERE (DATE(MobileDateTime) = ? OR Date = ?)
+         SELECT EmpId FROM Activity WHERE (DATE(MobileDateTime) = ? OR Date = ? OR DATE(create_time) = ? OR DATE(ServerDateTime) = ?)
          UNION
          SELECT EmpId FROM Attendance WHERE (Date = ? OR DateTime = ?)
       ) AS combined_emps
     `;
-    let queryParams = [inputDate, inputDate, inputDate, inputDate];
+    let queryParams = [inputDate, inputDate, inputDate, inputDate, inputDate, inputDate];
 
     if (!isAdmin && empIdParam) {
       // Find subordinate IDs if user is an RM
@@ -66,11 +74,11 @@ const getTodayAttendance = async (req, res) => {
 
         // Fetch activity events
         const [records] = await db.query(
-          `SELECT ActivityId, EmpId, Event, GeoLocation, MobileDateTime, Time, Date 
+          `SELECT ActivityId, EmpId, Event, GeoLocation, MobileDateTime, Time, Date, create_time, ServerDateTime 
            FROM Activity 
-           WHERE EmpId = ? AND (DATE(MobileDateTime) = ? OR Date = ?) 
-           ORDER BY COALESCE(MobileDateTime, CONCAT(Date, ' ', Time)) ASC`,
-          [empId, inputDate, inputDate]
+           WHERE EmpId = ? AND (DATE(MobileDateTime) = ? OR Date = ? OR DATE(create_time) = ? OR DATE(ServerDateTime) = ?) 
+           ORDER BY COALESCE(MobileDateTime, CONCAT(Date, ' ', Time), create_time, ServerDateTime) ASC`,
+          [empId, inputDate, inputDate, inputDate, inputDate]
         );
 
         // Fetch attendance record
@@ -102,7 +110,7 @@ const getTodayAttendance = async (req, res) => {
         let firstInTime = 'N/A';
         let firstInLoc = 'N/A';
         if (firstIn) {
-          firstInTime = formatTimeAMPM(firstIn.MobileDateTime || firstIn.Time);
+          firstInTime = formatTimeAMPM(firstIn.MobileDateTime || firstIn.Time || firstIn.create_time || firstIn.ServerDateTime);
           firstInLoc = firstIn.GeoLocation || 'N/A';
         } else if (att && att.InTime) {
           firstInTime = formatTimeAMPM(att.InTime);
@@ -113,7 +121,7 @@ const getTodayAttendance = async (req, res) => {
         let lastOutTime = 'N/A';
         let lastOutLoc = 'N/A';
         if (lastOut) {
-          lastOutTime = formatTimeAMPM(lastOut.MobileDateTime || lastOut.Time);
+          lastOutTime = formatTimeAMPM(lastOut.MobileDateTime || lastOut.Time || lastOut.create_time || lastOut.ServerDateTime);
           lastOutLoc = lastOut.GeoLocation || 'N/A';
         } else if (att && att.OutTime) {
           lastOutTime = formatTimeAMPM(att.OutTime);

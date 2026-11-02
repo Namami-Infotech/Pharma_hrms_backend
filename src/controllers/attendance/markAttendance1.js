@@ -76,6 +76,14 @@ const markAttendance1 = async (req, res) => {
       imageUrl
     ]);
 
+    // Immediately synchronize first punch in, last punch out & working hours into Attendance table
+    try {
+      const { syncAttendance } = require('./syncAttendance');
+      await syncAttendance(db, EmpId, currentDate);
+    } catch (syncErr) {
+      console.warn('Could not sync Attendance record:', syncErr.message);
+    }
+
     return res.json({
       success: true,
       message: 'Successfully marked attendance.',

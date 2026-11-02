@@ -25,9 +25,25 @@ const approveQuotation = async (req, res) => {
 
     const { getRmEmailForEmployee } = require('./quotationHelper');
 
-    // Update status to 'Approved'
-    await db.query('UPDATE Quotations SET status = ? WHERE id = ?', ['Approved', id]);
+    // Determine who is approving (passed from frontend user session)
+    const approvedBy = req.body.approved_by || req.body.approvedBy || (req.user && (req.user.username || req.user.Name || req.user.EmpId)) || null;
+
+    // Update status to 'Approved' and record approved_by & approval_date
+    try {
+      await db.query(
+        'UPDATE Quotations SET status = ?, approved_by = ?, approval_date = CURRENT_TIMESTAMP WHERE id = ?',
+        ['Approved', approvedBy, id]
+      );
+    } catch (colErr) {
+      if (colErr.code === 'ER_BAD_FIELD_ERROR') {
+        console.warn('approved_by or approval_date column missing in Quotations table. Updating status only.');
+        await db.query('UPDATE Quotations SET status = ? WHERE id = ?', ['Approved', id]);
+      } else {
+        throw colErr;
+      }
+    }
     quotation.status = 'Approved';
+    quotation.approved_by = approvedBy;
 
     // Parse items if string
     if (typeof quotation.items === 'string') {

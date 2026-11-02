@@ -2,11 +2,20 @@ const db = require('../../config/db');
 const helpers = require('./attendanceHelper');
 const { OFFICE_LAT, OFFICE_LON, calculateDistance, formatTimeAMPM, formatDateDDMMYYYY, calculateWorkingHours, saveBase64Image } = helpers;
 
+const { syncAttendance } = require('./syncAttendance');
+
 const getRawAttendance = async (req, res) => {
   const response = { success: false, message: '', data: null };
 
   try {
-    const [rows] = await db.query('SELECT * FROM Attendance');
+    // Sync latest Activity records into Attendance table so report is always up to date
+    try {
+      await syncAttendance(db);
+    } catch (syncErr) {
+      console.warn('Could not sync Attendance in getRawAttendance:', syncErr.message);
+    }
+
+    const [rows] = await db.query('SELECT * FROM Attendance ORDER BY Date DESC, InTime DESC');
     if (rows && rows.length > 0) {
       response.success = true;
       response.data = rows;

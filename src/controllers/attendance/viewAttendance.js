@@ -76,11 +76,19 @@ const viewAttendance = async (req, res) => {
       }
     }
 
+    // Sync Attendance table so records are always fresh
+    try {
+      const { syncAttendance } = require('./syncAttendance');
+      await syncAttendance(db, empId);
+    } catch (syncErr) {
+      console.warn('Could not sync Attendance in viewAttendance:', syncErr.message);
+    }
+
     const empWiseActivities = {};
     if (attendanceData && attendanceData.length > 0) {
       for (const activity of attendanceData) {
         const id = activity.EmpId;
-        const rawDate = activity.MobileDateTime || (activity.Date ? `${activity.Date} ${activity.Time || '00:00:00'}` : null);
+        const rawDate = activity.MobileDateTime || (activity.Date ? `${activity.Date} ${activity.Time || '00:00:00'}` : null) || activity.create_time || activity.ServerDateTime;
         if (!rawDate) continue;
 
         const origDate = new Date(rawDate);
@@ -118,9 +126,14 @@ const viewAttendance = async (req, res) => {
           }
         }
 
+        if (!firstIn && activities.length > 0) firstIn = activities[0];
+        if (!lastOut && activities.length > 1 && activities[activities.length - 1] !== firstIn) {
+          lastOut = activities[activities.length - 1];
+        }
+
         let workingHours = 'N/A';
-        const inTimeVal = firstIn?.MobileDateTime || firstIn?.Time;
-        const outTimeVal = lastOut?.MobileDateTime || lastOut?.Time;
+        const inTimeVal = firstIn?.MobileDateTime || firstIn?.Time || firstIn?.create_time || firstIn?.ServerDateTime;
+        const outTimeVal = lastOut?.MobileDateTime || lastOut?.Time || lastOut?.create_time || lastOut?.ServerDateTime;
         if (inTimeVal && outTimeVal) {
           workingHours = calculateWorkingHours(inTimeVal, outTimeVal);
         }
@@ -128,11 +141,11 @@ const viewAttendance = async (req, res) => {
         processedData.push({
           empId: id,
           date: dateStr,
-          inActivityId: firstIn ? firstIn.ActivityId : 'N/A',
-          outActivityId: lastOut ? lastOut.ActivityId : 'N/A',
-          firstIn: firstIn ? formatTimeAMPM(firstIn.MobileDateTime || firstIn.Time) : 'N/A',
+          inActivityId: firstIn ? (firstIn.ActivityId || firstIn.id) : 'N/A',
+          outActivityId: lastOut ? (lastOut.ActivityId || lastOut.id) : 'N/A',
+          firstIn: firstIn ? formatTimeAMPM(firstIn.MobileDateTime || firstIn.Time || firstIn.create_time || firstIn.ServerDateTime) : 'N/A',
           firstInLocation: firstIn ? firstIn.GeoLocation : 'N/A',
-          lastOut: lastOut ? formatTimeAMPM(lastOut.MobileDateTime || lastOut.Time) : 'N/A',
+          lastOut: lastOut ? formatTimeAMPM(lastOut.MobileDateTime || lastOut.Time || lastOut.create_time || lastOut.ServerDateTime) : 'N/A',
           lastOutLocation: lastOut ? lastOut.GeoLocation : 'N/A',
           workingHours,
           firstEvent: firstEvent || 'In',

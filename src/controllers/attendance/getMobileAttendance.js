@@ -2,16 +2,24 @@ const db = require('../../config/db');
 const helpers = require('./attendanceHelper');
 const { OFFICE_LAT, OFFICE_LON, calculateDistance, formatTimeAMPM, formatDateDDMMYYYY, calculateWorkingHours, saveBase64Image } = helpers;
 
+const { syncAttendance } = require('./syncAttendance');
+
 const getMobileAttendance = async (req, res) => {
   const response = { success: false, message: '', data: [] };
   const empId = req.query.EmpId || null;
 
   try {
-    let sql = 'SELECT * FROM Attendance ORDER BY InTime DESC';
+    try {
+      await syncAttendance(db, empId);
+    } catch (syncErr) {
+      console.warn('Could not sync Attendance in getMobileAttendance:', syncErr.message);
+    }
+
+    let sql = 'SELECT * FROM Attendance ORDER BY Date DESC, InTime DESC';
     const params = [];
 
     if (empId) {
-      sql = 'SELECT * FROM Attendance WHERE EmpId = ? ORDER BY InTime DESC';
+      sql = 'SELECT * FROM Attendance WHERE EmpId = ? ORDER BY Date DESC, InTime DESC';
       params.push(empId);
     }
 

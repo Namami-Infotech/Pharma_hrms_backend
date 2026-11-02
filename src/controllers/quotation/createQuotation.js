@@ -132,6 +132,19 @@ const createQuotation = async (req, res) => {
 
     const clientEmail = (data.client_email || '').trim();
 
+    let creatorName = data.prepared_by || req.user?.username || req.user?.Name || req.user?.name || '';
+    if ((!creatorName || creatorName === 'Aberdure Sales Team' || creatorName === 'Sales Team') && empIdentifier) {
+      try {
+        const [empRow] = await db.query('SELECT Name FROM Employees WHERE EmpId = ? LIMIT 1', [empIdentifier]);
+        if (empRow && empRow.length > 0 && empRow[0].Name) {
+          creatorName = empRow[0].Name;
+        }
+      } catch (_) {}
+    }
+    if (!creatorName || creatorName === 'Aberdure Sales Team' || creatorName === 'Sales Team') {
+      creatorName = empIdentifier ? String(empIdentifier) : null;
+    }
+
     const [result] = await db.query(sql, [
       quotationNo,
       quotationDate,
@@ -153,7 +166,7 @@ const createQuotation = async (req, res) => {
       initialStatus,
       data.terms_conditions || defaultTerms,
       data.notes || '',
-      data.prepared_by || 'Aberdure Sales Team',
+      creatorName,
       empIdentifier ? String(empIdentifier) : null,
       tenantId
     ]);
