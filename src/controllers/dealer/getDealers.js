@@ -20,7 +20,7 @@ const getDealers = async (req, res) => {
 
     // 2. Fetch Transaction-based dealers (MenuId = 1)
     const [hdrRows] = await db.query(
-      `SELECT TH.SRNo AS DealerID, TH.ActivityId, TH.CreatedAt 
+      `SELECT TH.Id, TH.SRNo AS DealerID, TH.ActivityId, TH.CreatedAt 
        FROM TransactionHDR TH 
        WHERE TH.MenuId = 1
        ORDER BY TH.Id DESC`
@@ -44,8 +44,14 @@ const getDealers = async (req, res) => {
         [activityId]
       );
 
+      // Determine initial clean numeric ID
+      let resolvedDealerId = row.DealerID ? Number(row.DealerID) : null;
+      if (!resolvedDealerId || isNaN(resolvedDealerId)) {
+        resolvedDealerId = row.Id; // Fallback to sequential numeric row Id
+      }
+
       const dealer = {
-        DealerID: row.DealerID || row.ActivityId,
+        DealerID: resolvedDealerId,
         ActivityId: activityId,
         LatLong: latLong,
         CreatedAt: row.CreatedAt
@@ -72,6 +78,50 @@ const getDealers = async (req, res) => {
       dealer.MailId = dealer['Mail Id'] || dealer.MailId || '';
       dealer.Remarks = dealer['Remarks'] || dealer.Remarks || '';
 
+      // Extract employee ID if encoded in ActivityId (e.g. 2026-10-31 18:57:42ADMIN0002)
+      const empMatch = activityId ? activityId.match(/[A-Za-z0-9]+$/) : null;
+      dealer.AddedByEmpId = dealer.AddedByEmpId || (empMatch ? empMatch[0] : '');
+
+      // Check if dealer already exists in Dealers table; if not, sync to Dealers so MySQL and all modules see it
+      try {
+        const [existingDealer] = await db.query(
+          `SELECT DealerID FROM Dealers WHERE DealerID = ? OR (CompanyName = ? AND DealerName = ?) LIMIT 1`,
+          [resolvedDealerId, dealer.CompanyName || '', dealer.DealerName || '']
+        );
+
+        if (existingDealer && existingDealer.length > 0) {
+          resolvedDealerId = existingDealer[0].DealerID;
+          if (!row.DealerID || Number(row.DealerID) !== resolvedDealerId) {
+            await db.query(`UPDATE TransactionHDR SET SRNo = ? WHERE Id = ?`, [resolvedDealerId, row.Id]);
+          }
+        } else {
+          const [insRes] = await db.query(
+            `INSERT INTO Dealers (DealerID, DealerName, Address, ContactInfo, LatLong, CompanyName, MailId, Remarks, AddedByEmpId) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE DealerName = VALUES(DealerName)`,
+            [
+              resolvedDealerId,
+              dealer.DealerName || dealer.CompanyName || `Dealer ${resolvedDealerId}`,
+              dealer.Address || '',
+              dealer.ContactInfo || '',
+              dealer.LatLong || '',
+              dealer.CompanyName || '',
+              dealer.MailId || '',
+              dealer.Remarks || '',
+              dealer.AddedByEmpId || ''
+            ]
+          );
+          if (insRes && insRes.insertId) {
+            resolvedDealerId = insRes.insertId;
+          }
+          await db.query(`UPDATE TransactionHDR SET SRNo = ? WHERE Id = ?`, [resolvedDealerId, row.Id]);
+        }
+      } catch (syncErr) {
+        console.warn('Dealers table auto-sync notice:', syncErr.message);
+      }
+
+      dealer.DealerID = resolvedDealerId;
+
       // Build structured dynamic values list for easy frontend rendering
       const dynamicValues = checkpoints.map(chk => {
         const foundDtl = dtlRows.find(d => d.ChkId === chk.Id);
@@ -87,11 +137,7 @@ const getDealers = async (req, res) => {
       });
       dealer.dynamicValues = dynamicValues;
 
-      if (row.DealerID) {
-        activityDealerMap.set(Number(row.DealerID), dealer);
-      } else {
-        activityDealerMap.set(activityId, dealer);
-      }
+      activityDealerMap.set(resolvedDealerId, dealer);
     }
 
     // 3. Also fetch directly from Dealers table for complete backward compatibility
