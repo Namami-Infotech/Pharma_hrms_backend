@@ -1,5 +1,5 @@
 const db = require('../../config/db');
-const { getDayDiffInclusive } = require('./leaveHelper');
+const { getDayDiffInclusive, ensureCasualLeaveAccrual } = require('./leaveHelper');
 
 const applyLeave = async (req, res) => {
   const response = { success: false, message: '' };
@@ -20,24 +20,14 @@ const applyLeave = async (req, res) => {
   try {
     const days = getDayDiffInclusive(startDate, endDate);
 
-    let requiresMedicalDocs = false;
-    let medicalDocsMessage = '';
-
-    if (category === 'SL' && days > 1) {
-      requiresMedicalDocs = true;
-      medicalDocsMessage = 'For leave approval';
-      if (!data.hasMedicalDocs) {
-        status = 'Pending';
-        medicalDocsMessage += ' please submit mediacal documents to HR.';
-      } else {
-        medicalDocsMessage += 'Medical documents submitted with application.';
-      }
+    if (!['CL', 'LWP'].includes(category)) {
+      response.message = 'Only Casual Leave (CL) and Leave Without Pay (LWP) are available.';
+      return res.json(response);
     }
 
     const tenantId = data.Tenent_Id || data.tenent_id || 1;
 
-    // LWP or HalfDay
-    if (category === 'LWP' || category === 'HalfDay') {
+    if (category === 'LWP') {
       const insertSql = `
         INSERT INTO Leaves (EmpId, LeaveType, StartDate, EndDate, TotalDays, Reason, Status, category, Tenent_Id) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -45,22 +35,14 @@ const applyLeave = async (req, res) => {
       await db.execute(insertSql, [empid, category, startDate, endDate, days, reason, status, category, tenantId]);
 
       response.success = true;
-      response.message =
-        category === 'HalfDay'
-          ? 'Half Day leave applied successfully.'
-          : 'Leave Without Pay applied successfully.';
-      return res.json(response);
-    }
-
-    const validCategories = ['EL', 'SL', 'CompOff', 'BL', 'PL', 'CL'];
-    if (!validCategories.includes(category)) {
-      response.message = 'Invalid leave category.';
+      response.message = 'Leave Without Pay applied successfully.';
       return res.json(response);
     }
 
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
+      await ensureCasualLeaveAccrual(empid);
 
       // Check balance
       let [rows] = await conn.query(
@@ -70,7 +52,7 @@ const applyLeave = async (req, res) => {
 
       if (!rows || rows.length === 0) {
         await conn.execute(
-          'INSERT INTO EmployeeLeave (EmpId, SL, EL, CompOff, BL, PL, CL, Tenent_Id) VALUES (?, 1, 0, 0, 0, 0, 0, ?)',
+          'INSERT INTO EmployeeLeave (EmpId, CL, Tenent_Id) VALUES (?, 0, ?)',
           [empid, tenantId]
         );
         [rows] = await conn.query(
@@ -109,18 +91,9 @@ const applyLeave = async (req, res) => {
 
       await conn.commit();
 
-      let successMessage = 'Leave applied and leave count updated successfully.';
-      if (requiresMedicalDocs) {
-        successMessage = medicalDocsMessage + '.';
-      }
-
       response.success = true;
-      response.message = successMessage;
+      response.message = 'Casual leave applied and leave count updated successfully.';
       response.status = status;
-      if (requiresMedicalDocs) {
-        response.requiresMedicalDocs = true;
-        response.medicalDocsNote = medicalDocsMessage;
-      }
 
       return res.json(response);
     } catch (txErr) {

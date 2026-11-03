@@ -1,5 +1,6 @@
 const db = require('../../config/db');
 const { calculateWeeklyOffs } = require('./salaryHelper');
+const { ensureCasualLeaveAccrual } = require('../leave/leaveHelper');
 
 const calculateSalary = async (req, res) => {
   const response = { success: false, message: '', data: null };
@@ -78,6 +79,24 @@ const calculateSalary = async (req, res) => {
       leavesMap[l.EmpId] = l.LeaveDays;
     }
 
+    const [casualLeaveRows] = await db.query(
+      `SELECT EmpId, SUM(
+         DATEDIFF(
+           LEAST(?, EndDate),
+           GREATEST(?, StartDate)
+         ) + 1
+       ) AS CasualLeaveDays
+       FROM Leaves
+       WHERE category = 'CL' AND Status = 'Approved'
+         AND StartDate <= ? AND EndDate >= ?
+       GROUP BY EmpId`,
+      [lastDay, firstDay, lastDay, firstDay]
+    );
+    const casualLeaveMap = {};
+    for (const leave of casualLeaveRows) {
+      casualLeaveMap[leave.EmpId] = parseInt(leave.CasualLeaveDays, 10) || 0;
+    }
+
     const [holRows] = await db.query(
       `SELECT COUNT(date) AS HolidayCount
        FROM Holidays
@@ -89,14 +108,20 @@ const calculateSalary = async (req, res) => {
     const salariesData = [];
     for (const emp of employees) {
       const empId = emp.EmpId;
+      await ensureCasualLeaveAccrual(empId);
       const basicSalary = parseFloat(salariesMap[empId] || 0);
       const presentDays = parseInt(attendanceMap[empId] || 0, 10);
       const leaveDays = parseInt(leavesMap[empId] || 0, 10);
       const weekOffs = calculateWeeklyOffs(emp.WeekOff, month, year, totalDaysInMonth);
       const actualWorkingDays = totalDaysInMonth - (holidays + weekOffs);
+      const paidLeaveDays = Math.min(
+        casualLeaveMap[empId] || 0,
+        Math.max(0, actualWorkingDays - presentDays)
+      );
+      const payableDays = Math.min(actualWorkingDays, presentDays + paidLeaveDays);
 
       const calculatedSalary =
-        actualWorkingDays > 0 ? (basicSalary / actualWorkingDays) * presentDays : 0;
+        actualWorkingDays > 0 ? (basicSalary / actualWorkingDays) * payableDays : 0;
 
       salariesData.push({
         EmpId: empId,
@@ -108,6 +133,7 @@ const calculateSalary = async (req, res) => {
           Holidays: holidays,
           WeekOffs: weekOffs,
           PresentDays: presentDays,
+          PaidLeaveDays: paidLeaveDays,
           LeaveDays: leaveDays,
           ActualWorkingDays: actualWorkingDays
         },

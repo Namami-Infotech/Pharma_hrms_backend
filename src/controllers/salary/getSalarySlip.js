@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const { ensureCasualLeaveAccrual } = require('../leave/leaveHelper');
 
 const MONTH_NAMES = [
   'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
@@ -74,6 +75,7 @@ const getSalarySlip = async (req, res) => {
     }
 
     const emp = empRows[0];
+    await ensureCasualLeaveAccrual(empId);
 
     // 2. Check if a pre-computed record exists in salary_records_new
     let record = null;
@@ -127,10 +129,27 @@ const getSalarySlip = async (req, res) => {
       }
     }
 
+    let paidCasualLeaveDays = 0;
+    try {
+      const [leaveRows] = await db.query(
+        `SELECT SUM(
+           DATEDIFF(LEAST(?, EndDate), GREATEST(?, StartDate)) + 1
+         ) AS leaveDays
+         FROM Leaves
+         WHERE EmpId = ? AND category = 'CL' AND Status = 'Approved'
+           AND StartDate <= ? AND EndDate >= ?`,
+        [`${year}-${String(monthNumber).padStart(2, '0')}-${daysInMonth}`, `${year}-${String(monthNumber).padStart(2, '0')}-01`, empId,
+          `${year}-${String(monthNumber).padStart(2, '0')}-${daysInMonth}`, `${year}-${String(monthNumber).padStart(2, '0')}-01`]
+      );
+      paidCasualLeaveDays = parseInt(leaveRows[0]?.leaveDays, 10) || 0;
+    } catch (leaveErr) {
+      console.warn('Error fetching approved casual leave for salary slip:', leaveErr.message);
+    }
+
     // Determine payableDays:
     // If client provided a custom override in query or body (e.g., ?days=... or ?payableDays=...), respect it;
     // Otherwise, use the actual marked attendance days from Attendance!
-    let payableDays = attendanceDays;
+    let payableDays = Math.min(daysInMonth, attendanceDays + paidCasualLeaveDays);
     const explicitDays = query.days ?? query.payableDays ?? body.days ?? body.payableDays;
     if (explicitDays !== undefined && explicitDays !== null && explicitDays !== '') {
       const parsed = parseInt(explicitDays, 10);
@@ -154,14 +173,15 @@ const getSalarySlip = async (req, res) => {
     // Day-wise Actual Earnings: (Monthly Component / daysInMonth) * payableDays
     const dayRatio = daysInMonth > 0 ? (payableDays / daysInMonth) : 0;
 
-    const actualBasic = Math.round(basicAndDa * dayRatio);
+    const actualBasic = Math.round(basic * dayRatio);
+    const actualDa = Math.round(da * dayRatio);
     const actualHra = Math.round(hra * dayRatio);
     const actualConv = Math.round(conv * dayRatio);
     const actualSpecialAllow = Math.round(specialAllow * dayRatio);
     const actualGwrInc = Math.round(gwrInc * dayRatio);
     const actualPerformanceBonus = Math.round(performanceBonus * dayRatio);
 
-    const actualEarningsTotal = actualBasic + actualHra + actualConv + actualSpecialAllow + actualGwrInc + actualPerformanceBonus;
+    const actualEarningsTotal = actualBasic + actualDa + actualHra + actualConv + actualSpecialAllow + actualGwrInc + actualPerformanceBonus;
     const grossPay = actualEarningsTotal;
 
     // Query approved advance payments for this employee for this specific month & year
@@ -249,6 +269,9 @@ const getSalarySlip = async (req, res) => {
 
       // 1. Rate Column (Monthly Master Rates)
       rate: {
+        salary: Math.round(basic),
+        da: Math.round(da),
+        // Retained for clients that still consume the combined field.
         basicDa: Math.round(basicAndDa),
         hra: Math.round(hra),
         conv: Math.round(conv),
@@ -259,6 +282,7 @@ const getSalarySlip = async (req, res) => {
       // 2. Actual Earning Column (Day-wise Multiplied)
       earnings: {
         basic: actualBasic,
+        da: actualDa,
         hra: actualHra,
         conv: actualConv,
         specialAllow: actualSpecialAllow,

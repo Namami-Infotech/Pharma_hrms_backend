@@ -105,6 +105,11 @@ CREATE TABLE IF NOT EXISTS `EmployeeLeave` (
   INDEX (`Tenent_Id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `EmployeeLeaveAccrual` (
+  `EmpId` VARCHAR(50) PRIMARY KEY,
+  `LastAccruedMonth` DATE NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 4. Leaves Table
 CREATE TABLE IF NOT EXISTS `Leaves` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -818,4 +823,3 @@ CREATE TABLE IF NOT EXISTS `Visit` (
   INDEX (`Plan_Visit`),
   INDEX (`Status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-

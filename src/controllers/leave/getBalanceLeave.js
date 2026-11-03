@@ -1,5 +1,5 @@
 const db = require('../../config/db');
-const { getDayDiffInclusive } = require('./leaveHelper');
+const { ensureCasualLeaveAccrual } = require('./leaveHelper');
 
 const getBalanceLeave = async (req, res) => {
   const response = { success: false, message: '', data: [] };
@@ -11,6 +11,7 @@ const getBalanceLeave = async (req, res) => {
   }
 
   try {
+    await ensureCasualLeaveAccrual(empid);
     const [rows] = await db.query('SELECT * FROM EmployeeLeave WHERE EmpId = ? ORDER BY id DESC', [empid]);
 
     let leaveRow = rows && rows.length > 0 ? rows[0] : null;
@@ -18,7 +19,7 @@ const getBalanceLeave = async (req, res) => {
     if (!leaveRow) {
       // Auto-initialize leave record for this employee if none exists
       await db.execute(
-        'INSERT INTO EmployeeLeave (EmpId, SL, EL, CompOff, BL, PL, CL, Tenent_Id) VALUES (?, 1, 0, 0, 0, 0, 0, 1)',
+        'INSERT INTO EmployeeLeave (EmpId, CL, Tenent_Id) VALUES (?, 0, 1)',
         [empid]
       );
       const [newRows] = await db.query('SELECT * FROM EmployeeLeave WHERE EmpId = ? ORDER BY id DESC', [empid]);
@@ -27,8 +28,6 @@ const getBalanceLeave = async (req, res) => {
 
     if (leaveRow) {
       const data = { ...leaveRow };
-      data.HalfDay = 1;
-
       response.TotalLeave = data.TotalLeave ?? data.totalLeave ?? 0;
       response.BalanceLeave = data.BalanceLeave ?? data.balanceLeave ?? 0;
       response.Tenent_Id = data.Tenent_Id ?? data.tenent_id ?? null;
@@ -49,6 +48,16 @@ const getBalanceLeave = async (req, res) => {
       delete data.tenent_id;
       delete data.FinancialYear;
       delete data.financialYear;
+      delete data.SL;
+      delete data.sl;
+      delete data.EL;
+      delete data.el;
+      delete data.PL;
+      delete data.pl;
+      delete data.BL;
+      delete data.bl;
+      delete data.CompOff;
+      delete data.compoff;
 
       response.success = true;
       response.data = data;

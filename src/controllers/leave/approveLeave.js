@@ -46,9 +46,8 @@ const approveLeave = async (req, res) => {
     await conn.execute('UPDATE Leaves SET Status = ?, ApprovedDate = NOW() WHERE id = ?', [status, leaveId]);
 
     if (status === 'Rejected') {
-      if (category !== 'LWP' && category !== 'HalfDay') {
-        const validCategories = ['EL', 'SL', 'CompOff', 'BL', 'PL', 'CL'];
-        if (!validCategories.includes(category)) {
+      if (category !== 'LWP') {
+        if (category !== 'CL') {
           await conn.rollback();
           response.message = 'Invalid leave category.';
           return res.json(response);
