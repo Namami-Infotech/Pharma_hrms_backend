@@ -14,17 +14,16 @@ const createQuotation = async (req, res) => {
   const currentYear = new Date().getFullYear();
 
   try {
-    // 1. Auto-generate quotation number if not provided or contains placeholder like PREVIEW/AUTO
+    // 1. Auto-generate quotation number if not provided or contains placeholder like PREVIEW/AUTO (Short format: QT-XXXX)
     let quotationNo = (data.quotation_no || '').trim();
     if (!quotationNo || quotationNo.toUpperCase().includes('PREVIEW') || quotationNo.toUpperCase().includes('AUTO')) {
-      const [allYearRows] = await db.query(
-        'SELECT quotation_no FROM Quotations WHERE quotation_no LIKE ?',
-        [`AP/QT/${currentYear}/%`]
+      const [allRows] = await db.query(
+        'SELECT quotation_no FROM Quotations'
       );
 
       let maxNum = 0;
-      if (allYearRows && allYearRows.length > 0) {
-        for (const row of allYearRows) {
+      if (allRows && allRows.length > 0) {
+        for (const row of allRows) {
           const m = (row.quotation_no || '').match(/([0-9]+)$/);
           if (m) {
             const num = parseInt(m[1], 10);
@@ -33,7 +32,7 @@ const createQuotation = async (req, res) => {
         }
       }
       const nextNum = maxNum + 1;
-      quotationNo = `AP/QT/${currentYear}/${String(nextNum).padStart(4, '0')}`;
+      quotationNo = `QT-${String(nextNum).padStart(4, '0')}`;
     }
 
     // 2. Parse items and calculate amounts

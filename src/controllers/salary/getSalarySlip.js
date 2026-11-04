@@ -66,8 +66,10 @@ const getSalarySlip = async (req, res) => {
   const maxAllowedYear = prevDate.getFullYear();
   const maxAllowedMonth = prevDate.getMonth() + 1;
   if (year > maxAllowedYear || (year === maxAllowedYear && monthNumber > maxAllowedMonth)) {
-    response.message = 'Salary slip can only be generated for completed months (up to previous month). Current and future months are not completed yet.';
-    return res.status(400).json(response);
+    response.success = false;
+    response.message = 'Data not found (salary slip can only be generated for completed months).';
+    response.data = null;
+    return res.status(200).json(response);
   }
 
   try {
@@ -94,10 +96,10 @@ const getSalarySlip = async (req, res) => {
       const joinYear = jd.getFullYear();
       const joinMonth = jd.getMonth() + 1;
       if (year < joinYear || (year === joinYear && monthNumber < joinMonth)) {
-        const dStr = String(jd.getDate()).padStart(2, '0');
-        const mStr = String(joinMonth).padStart(2, '0');
-        response.message = `Salary slip cannot be generated before employee's joining month (${MONTH_NAMES[joinMonth - 1]} ${joinYear}, Joined: ${dStr}-${mStr}-${joinYear}).`;
-        return res.status(400).json(response);
+        response.success = false;
+        response.message = 'Data not found before employee joining date';
+        response.data = null;
+        return res.status(200).json(response);
       }
     }
 

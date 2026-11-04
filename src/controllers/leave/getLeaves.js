@@ -15,23 +15,24 @@ const getLeaves = async (req, res) => {
 
     if (isAdmin) {
       if (empId) {
-        conditions.push('EmpId = ?');
+        conditions.push('l.EmpId = ?');
         params.push(empId);
       }
     } else if (empId) {
       // RM can access their own leave requests AND leaves of employees under their RM
-      conditions.push('(EmpId = ? OR EmpId IN (SELECT EmpId FROM Employees WHERE RM = ? OR RM = (SELECT Name FROM Employees WHERE EmpId = ? LIMIT 1)))');
+      conditions.push('(l.EmpId = ? OR l.EmpId IN (SELECT EmpId FROM Employees WHERE RM = ? OR RM = (SELECT Name FROM Employees WHERE EmpId = ? LIMIT 1)))');
       params.push(empId, empId, empId);
     } else {
       response.message = 'Either empId or Admin role must be provided.';
       return res.json(response);
     }
 
-    if (conditions.length > 0) {
-      sql = `SELECT * FROM Leaves WHERE ${conditions.join(' AND ')} ORDER BY CreatedAt DESC`;
-    } else {
-      sql = 'SELECT * FROM Leaves ORDER BY CreatedAt DESC';
-    }
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    sql = `SELECT l.*, e.Name as EmployeeName, e.Designation as EmployeeDesignation 
+           FROM Leaves l 
+           LEFT JOIN Employees e ON l.EmpId = e.EmpId 
+           ${whereClause} 
+           ORDER BY l.CreatedAt DESC`;
 
     const [rows] = await db.query(sql, params);
 

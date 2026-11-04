@@ -20,7 +20,30 @@ const updateQuotation = async (req, res) => {
     const current = existing[0];
 
     // Status quick-update
-    if (data.status && Object.keys(data).length <= 5) {
+    if (data.status && Object.keys(data).length <= 8) {
+      // 1. Quotation status cannot be changed once Approved or Sent
+      if (['Approved', 'Sent'].includes(current.status)) {
+        response.message = 'This quotation is already ' + current.status + '. Status cannot be modified.';
+        return res.status(400).json(response);
+      }
+
+      // 2. RM cannot change status of their own quotation
+      const updaterEmpId = data.emp_id || data.empId || data.EmpId || (req.user && (req.user.emp_id || req.user.EmpId)) || null;
+      const role = (data.role || data.Role || (req.user && req.user.role) || '').toString();
+      const isAdmin = ['Admin', 'admin', 'SuperAdmin'].includes(role);
+      const creatorId = current.emp_id || current.EmpId;
+      const creatorName = current.prepared_by;
+      const updaterName = data.approved_by || (req.user && (req.user.username || req.user.Name));
+
+      if (!isAdmin) {
+        const isSelf = (updaterEmpId && creatorId && String(updaterEmpId).trim() === String(creatorId).trim()) ||
+                       (updaterName && creatorName && String(updaterName).trim() === String(creatorName).trim()) ||
+                       (updaterEmpId && creatorName && String(updaterEmpId).trim() === String(creatorName).trim());
+        if (isSelf) {
+          response.message = 'Reporting Managers cannot change the status of their own quotation.';
+          return res.status(403).json(response);
+        }
+      }
       if (data.status === 'Approved') {
         const approvedBy = data.approved_by || data.approvedBy || (req.user && (req.user.username || req.user.Name || req.user.EmpId)) || null;
         try {

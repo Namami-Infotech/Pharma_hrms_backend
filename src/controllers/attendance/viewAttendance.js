@@ -84,6 +84,16 @@ const viewAttendance = async (req, res) => {
       console.warn('Could not sync Attendance in viewAttendance:', syncErr.message);
     }
 
+    const empNameMap = {};
+    try {
+      const [allEmps] = await db.query('SELECT EmpId, Name, Designation FROM Employees');
+      (allEmps || []).forEach(e => {
+        empNameMap[e.EmpId] = e;
+      });
+    } catch (eErr) {
+      console.warn('Could not fetch employees for name mapping:', eErr.message);
+    }
+
     const empWiseActivities = {};
     if (attendanceData && attendanceData.length > 0) {
       for (const activity of attendanceData) {
@@ -140,6 +150,8 @@ const viewAttendance = async (req, res) => {
 
         processedData.push({
           empId: id,
+          employeeName: empNameMap[id]?.Name || id,
+          employeeDesignation: empNameMap[id]?.Designation || '',
           date: dateStr,
           inActivityId: firstIn ? (firstIn.ActivityId || firstIn.id) : 'N/A',
           outActivityId: lastOut ? (lastOut.ActivityId || lastOut.id) : 'N/A',

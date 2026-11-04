@@ -18,6 +18,17 @@ const getDealers = async (req, res) => {
       chkMap[chk.Id] = chk.Description;
     });
 
+    // Fetch employee names for AddedByName lookup
+    const empMap = {};
+    try {
+      const [empRows] = await db.query(`SELECT EmpId, Name FROM Employees`);
+      empRows.forEach(e => {
+        if (e.EmpId) empMap[e.EmpId] = e.Name || e.EmpId;
+      });
+    } catch (e) {
+      console.warn('Employees lookup error in getDealers:', e.message);
+    }
+
     // 2. Fetch Transaction-based dealers (MenuId = 1)
     const [hdrRows] = await db.query(
       `SELECT TH.Id, TH.SRNo AS DealerID, TH.ActivityId, TH.CreatedAt 
@@ -73,14 +84,21 @@ const getDealers = async (req, res) => {
       // Also set standard fallback properties for legacy component compatibility
       dealer.CompanyName = dealer['Company Name'] || dealer.CompanyName || '';
       dealer.Address = dealer['Address'] || dealer.Address || '';
+      dealer.State = dealer['Dealer State'] || dealer['State'] || '';
       dealer.DealerName = dealer['Dealer Name'] || dealer.DealerName || dealer.CompanyName;
       dealer.ContactInfo = dealer['Contact Info'] || dealer.ContactInfo || '';
       dealer.MailId = dealer['Mail Id'] || dealer.MailId || '';
       dealer.Remarks = dealer['Remarks'] || dealer.Remarks || '';
 
       // Extract employee ID if encoded in ActivityId (e.g. 2026-10-31 18:57:42ADMIN0002)
-      const empMatch = activityId ? activityId.match(/[A-Za-z0-9]+$/) : null;
-      dealer.AddedByEmpId = dealer.AddedByEmpId || (empMatch ? empMatch[0] : '');
+      // Do not treat pure numeric timestamps (like 1793777800253) as employee IDs
+      const empMatch = activityId ? activityId.match(/([A-Za-z]+[0-9]*)$/) : null;
+      if (empMatch && !/^\d+$/.test(empMatch[1])) {
+        dealer.AddedByEmpId = empMatch[1];
+      } else {
+        dealer.AddedByEmpId = '';
+      }
+      dealer.AddedByName = empMap[dealer.AddedByEmpId] || (dealer.AddedByEmpId.toUpperCase().includes('ADMIN') ? 'Admin' : 'Admin');
 
       // Check if dealer already exists in Dealers table; if not, sync to Dealers so MySQL and all modules see it
       try {
@@ -96,13 +114,14 @@ const getDealers = async (req, res) => {
           }
         } else {
           const [insRes] = await db.query(
-            `INSERT INTO Dealers (DealerID, DealerName, Address, ContactInfo, LatLong, CompanyName, MailId, Remarks, AddedByEmpId) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `INSERT INTO Dealers (DealerID, DealerName, Address, State, ContactInfo, LatLong, CompanyName, MailId, Remarks, AddedByEmpId) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE DealerName = VALUES(DealerName)`,
             [
               resolvedDealerId,
               dealer.DealerName || dealer.CompanyName || `Dealer ${resolvedDealerId}`,
               dealer.Address || '',
+              dealer.State || '',
               dealer.ContactInfo || '',
               dealer.LatLong || '',
               dealer.CompanyName || '',
@@ -154,11 +173,14 @@ const getDealers = async (req, res) => {
         existing.CompanyName = existing.CompanyName || dRow.CompanyName || '';
         existing.Address = existing.Address || dRow.Address || '';
         existing.DealerName = existing.DealerName || dRow.DealerName || '';
+        existing.State = existing.State || dRow.State || existing['Dealer State'] || '';
         existing.ContactInfo = existing.ContactInfo || dRow.ContactInfo || '';
         existing.MailId = existing.MailId || dRow.MailId || '';
         existing.Remarks = existing.Remarks || dRow.Remarks || '';
         existing.LatLong = existing.LatLong || dRow.LatLong || '';
-        existing.AddedByEmpId = dRow.AddedByEmpId || '';
+        if (dRow.AddedByEmpId && !/^\d{8,}$/.test(dRow.AddedByEmpId)) {
+          existing.AddedByEmpId = dRow.AddedByEmpId;
+        }
         existing.CreatedAt = existing.CreatedAt || dRow.CreateDate || '';
         existing.CreateDate = existing.CreatedAt;
 
@@ -169,6 +191,7 @@ const getDealers = async (req, res) => {
               const descLower = dv.description.toLowerCase();
               if (descLower.includes('company')) dv.value = existing.CompanyName;
               else if (descLower.includes('address')) dv.value = existing.Address;
+              else if (descLower.includes('state')) dv.value = existing.State;
               else if (descLower.includes('dealer')) dv.value = existing.DealerName;
               else if (descLower.includes('contact') || descLower.includes('phone')) dv.value = existing.ContactInfo;
               else if (descLower.includes('mail') || descLower.includes('email')) dv.value = existing.MailId;
@@ -182,6 +205,7 @@ const getDealers = async (req, res) => {
           DealerID: dRow.DealerID,
           DealerName: dRow.DealerName || '',
           Address: dRow.Address || '',
+          State: dRow.State || '',
           ContactInfo: dRow.ContactInfo || '',
           LatLong: dRow.LatLong || '',
           CompanyName: dRow.CompanyName || '',
@@ -195,6 +219,8 @@ const getDealers = async (req, res) => {
         // Map standard columns to matching checkpoint field names
         dealer['Company Name'] = dRow.CompanyName || '';
         dealer['Address'] = dRow.Address || '';
+        dealer['State'] = dRow.State || '';
+        dealer['Dealer State'] = dRow.State || '';
         dealer['Dealer Name'] = dRow.DealerName || '';
         dealer['Contact Info'] = dRow.ContactInfo || '';
         dealer['Mail Id'] = dRow.MailId || '';
@@ -205,6 +231,7 @@ const getDealers = async (req, res) => {
           const descLower = chk.Description.toLowerCase();
           if (descLower.includes('company')) val = dRow.CompanyName || '';
           else if (descLower.includes('address')) val = dRow.Address || '';
+          else if (descLower.includes('state')) val = dRow.State || '';
           else if (descLower.includes('dealer')) val = dRow.DealerName || '';
           else if (descLower.includes('contact') || descLower.includes('phone')) val = dRow.ContactInfo || '';
           else if (descLower.includes('mail') || descLower.includes('email')) val = dRow.MailId || '';
@@ -231,7 +258,15 @@ const getDealers = async (req, res) => {
       }
     }
 
-    const result = Array.from(activityDealerMap.values()).sort((a, b) => {
+    const result = Array.from(activityDealerMap.values()).map(dealer => {
+      let empId = (dealer.AddedByEmpId || '').trim();
+      if (/^\d{8,}$/.test(empId)) {
+        empId = '';
+      }
+      const resolvedName = empMap[empId] || (empId && empId.toUpperCase().includes('ADMIN') ? 'Admin' : '');
+      dealer.AddedByName = resolvedName || 'Admin';
+      return dealer;
+    }).sort((a, b) => {
       const idA = parseInt(a.DealerID || a.ActivityId || 0, 10);
       const idB = parseInt(b.DealerID || b.ActivityId || 0, 10);
       if (!isNaN(idA) && !isNaN(idB) && idA !== idB) {

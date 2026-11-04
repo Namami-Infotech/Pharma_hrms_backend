@@ -51,6 +51,7 @@ const addDealer = async (req, res) => {
     const contactInfo = getVal(4, ['contactInfo', 'Contact Info', 'phone', 'mobile']);
     const mailId = getVal(5, ['mailId', 'Mail Id', 'email', 'Email']);
     const remarks = getVal(6, ['remarks', 'Remarks']);
+    const state = getVal(7, ['dealerState', 'Dealer State', 'state', 'State']) || data.state || data.State || data.dealerState || '';
 
     const connection = await db.getConnection();
     try {
@@ -58,9 +59,9 @@ const addDealer = async (req, res) => {
 
       // 1. Save to Dealers table for standard reporting & visits
       const [dealerResult] = await connection.execute(
-        `INSERT INTO Dealers (DealerName, Address, ContactInfo, LatLong, CompanyName, MailId, Remarks, AddedByEmpId) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [dealerName, address, contactInfo, latLong, companyName, mailId, remarks, addedByEmpId]
+        `INSERT INTO Dealers (DealerName, Address, State, ContactInfo, LatLong, CompanyName, MailId, Remarks, AddedByEmpId) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [dealerName, address, state, contactInfo, latLong, companyName, mailId, remarks, addedByEmpId]
       );
 
       const newDealerId = dealerResult.insertId;

@@ -23,10 +23,32 @@ const approveQuotation = async (req, res) => {
 
     const quotation = rows[0];
 
-    const { getRmEmailForEmployee } = require('./quotationHelper');
+    // 1. If already approved or sent, reject further status changes
+    if (['Approved', 'Sent'].includes(quotation.status)) {
+      response.message = 'This quotation is already ' + quotation.status + '. Status cannot be modified.';
+      return res.status(400).json(response);
+    }
 
     // Determine who is approving (passed from frontend user session)
     const approvedBy = req.body.approved_by || req.body.approvedBy || (req.user && (req.user.username || req.user.Name || req.user.EmpId)) || null;
+    const approverEmpId = req.body.emp_id || req.body.empId || req.body.EmpId || (req.user && (req.user.emp_id || req.user.EmpId)) || null;
+    const role = (req.body.role || req.body.Role || (req.user && req.user.role) || '').toString();
+    const isAdmin = ['Admin', 'admin', 'SuperAdmin'].includes(role);
+    const creatorId = quotation.emp_id || quotation.EmpId;
+    const creatorName = quotation.prepared_by;
+
+    // 2. RM cannot approve their own quotation
+    if (!isAdmin) {
+      const isSelf = (approverEmpId && creatorId && String(approverEmpId).trim() === String(creatorId).trim()) ||
+                     (approvedBy && creatorName && String(approvedBy).trim() === String(creatorName).trim()) ||
+                     (approverEmpId && creatorName && String(approverEmpId).trim() === String(creatorName).trim());
+      if (isSelf) {
+        response.message = 'Reporting Managers cannot approve their own quotation.';
+        return res.status(403).json(response);
+      }
+    }
+
+    const { getRmEmailForEmployee } = require('./quotationHelper');
 
     // Update status to 'Approved' and record approved_by & approval_date
     try {
