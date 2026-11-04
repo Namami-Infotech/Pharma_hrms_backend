@@ -55,6 +55,11 @@ const getDealers = async (req, res) => {
         [activityId]
       );
 
+      // If TransactionDTL has no details for this activity (e.g. details were deleted), skip orphan HDR row
+      if (!dtlRows || dtlRows.length === 0) {
+        continue;
+      }
+
       // Determine initial clean numeric ID
       let resolvedDealerId = row.DealerID ? Number(row.DealerID) : null;
       if (!resolvedDealerId || isNaN(resolvedDealerId)) {
