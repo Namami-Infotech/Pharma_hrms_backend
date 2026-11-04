@@ -184,6 +184,8 @@ const getQuotations = async (req, res) => {
 
       return {
         ...r,
+        State: r.State || r.client_state || '',
+        client_state: r.State || r.client_state || '',
         prepared_by: creatorName,
         created_by_name: creatorName,
         approved_by: approverName,

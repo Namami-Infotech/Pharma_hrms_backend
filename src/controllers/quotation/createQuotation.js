@@ -131,15 +131,7 @@ const createQuotation = async (req, res) => {
       '4. Payment terms: 30 days credit from invoice date / advance as agreed.\n' +
       '5. Subject to Delhi jurisdiction.';
 
-    const sql = `
-      INSERT INTO Quotations (
-        quotation_no, quotation_date, valid_until, client_name, client_email, client_phone,
-        client_address, client_gst, subject, items, subtotal, discount_percent, discount_amount,
-        tax_type, tax_percent, tax_amount, total_amount, status, terms_conditions, notes,
-        prepared_by, emp_id, Tenent_Id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
+    const clientState = (data.State || data.state || data.client_state || '').trim();
     const clientEmail = (data.client_email || '').trim();
 
     let creatorName = data.prepared_by || req.user?.username || req.user?.Name || req.user?.name || '';
@@ -155,31 +147,82 @@ const createQuotation = async (req, res) => {
       creatorName = empIdentifier ? String(empIdentifier) : null;
     }
 
-    const [result] = await db.query(sql, [
-      quotationNo,
-      quotationDate,
-      validUntil,
-      clientName,
-      clientEmail,
-      data.client_phone || '',
-      data.client_address || '',
-      data.client_gst || '',
-      data.subject || 'Quotation for Supply of Pharmaceutical Products',
-      JSON.stringify(formattedItems),
-      subtotal,
-      discountPercent,
-      discountAmount,
-      taxType,
-      taxPercent,
-      taxAmount,
-      totalAmount,
-      initialStatus,
-      data.terms_conditions || defaultTerms,
-      data.notes || '',
-      creatorName,
-      empIdentifier ? String(empIdentifier) : null,
-      tenantId
-    ]);
+    const sql = `
+      INSERT INTO Quotations (
+        quotation_no, quotation_date, valid_until, client_name, client_email, client_phone,
+        client_address, State, client_gst, subject, items, subtotal, discount_percent, discount_amount,
+        tax_type, tax_percent, tax_amount, total_amount, status, terms_conditions, notes,
+        prepared_by, emp_id, Tenent_Id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    let result;
+    try {
+      [result] = await db.query(sql, [
+        quotationNo,
+        quotationDate,
+        validUntil,
+        clientName,
+        clientEmail,
+        data.client_phone || '',
+        data.client_address || '',
+        clientState,
+        data.client_gst || '',
+        data.subject || 'Quotation for Supply of Pharmaceutical Products',
+        JSON.stringify(formattedItems),
+        subtotal,
+        discountPercent,
+        discountAmount,
+        taxType,
+        taxPercent,
+        taxAmount,
+        totalAmount,
+        initialStatus,
+        data.terms_conditions || defaultTerms,
+        data.notes || '',
+        creatorName,
+        empIdentifier ? String(empIdentifier) : null,
+        tenantId
+      ]);
+    } catch (sqlErr) {
+      if (sqlErr.code === 'ER_BAD_FIELD_ERROR') {
+        const fallbackSql = `
+          INSERT INTO Quotations (
+            quotation_no, quotation_date, valid_until, client_name, client_email, client_phone,
+            client_address, client_gst, subject, items, subtotal, discount_percent, discount_amount,
+            tax_type, tax_percent, tax_amount, total_amount, status, terms_conditions, notes,
+            prepared_by, emp_id, Tenent_Id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        [result] = await db.query(fallbackSql, [
+          quotationNo,
+          quotationDate,
+          validUntil,
+          clientName,
+          clientEmail,
+          data.client_phone || '',
+          data.client_address || '',
+          data.client_gst || '',
+          data.subject || 'Quotation for Supply of Pharmaceutical Products',
+          JSON.stringify(formattedItems),
+          subtotal,
+          discountPercent,
+          discountAmount,
+          taxType,
+          taxPercent,
+          taxAmount,
+          totalAmount,
+          initialStatus,
+          data.terms_conditions || defaultTerms,
+          data.notes || '',
+          creatorName,
+          empIdentifier ? String(empIdentifier) : null,
+          tenantId
+        ]);
+      } else {
+        throw sqlErr;
+      }
+    }
 
     // Send email to client if within 35% discount limit (CC to RM)
     let emailSent = false;

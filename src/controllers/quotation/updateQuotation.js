@@ -151,12 +151,21 @@ const updateQuotation = async (req, res) => {
       ? parseFloat(data.total_amount)
       : Math.round(calculatedTotal * 100) / 100;
 
+    const clientState = data.State !== undefined 
+      ? data.State 
+      : (data.state !== undefined 
+          ? data.state 
+          : (data.client_state !== undefined 
+              ? data.client_state 
+              : (current.State || current.client_state || '')));
+
     const sql = `
       UPDATE Quotations SET
         client_name = ?,
         client_email = ?,
         client_phone = ?,
         client_address = ?,
+        State = ?,
         client_gst = ?,
         subject = ?,
         quotation_date = ?,
@@ -176,29 +185,84 @@ const updateQuotation = async (req, res) => {
       WHERE id = ?
     `;
 
-    await db.query(sql, [
-      data.client_name || current.client_name,
-      data.client_email !== undefined ? data.client_email : current.client_email,
-      data.client_phone !== undefined ? data.client_phone : current.client_phone,
-      data.client_address !== undefined ? data.client_address : current.client_address,
-      data.client_gst !== undefined ? data.client_gst : current.client_gst,
-      data.subject !== undefined ? data.subject : current.subject,
-      data.quotation_date || current.quotation_date,
-      data.valid_until !== undefined ? data.valid_until : current.valid_until,
-      formattedItems.length > 0 ? JSON.stringify(formattedItems) : current.items,
-      subtotal,
-      discountPercent,
-      discountAmount,
-      taxType,
-      taxPercent,
-      taxAmount,
-      totalAmount,
-      data.status || current.status,
-      data.terms_conditions !== undefined ? data.terms_conditions : current.terms_conditions,
-      data.notes !== undefined ? data.notes : current.notes,
-      data.prepared_by !== undefined ? data.prepared_by : current.prepared_by,
-      id
-    ]);
+    try {
+      await db.query(sql, [
+        data.client_name || current.client_name,
+        data.client_email !== undefined ? data.client_email : current.client_email,
+        data.client_phone !== undefined ? data.client_phone : current.client_phone,
+        data.client_address !== undefined ? data.client_address : current.client_address,
+        clientState,
+        data.client_gst !== undefined ? data.client_gst : current.client_gst,
+        data.subject !== undefined ? data.subject : current.subject,
+        data.quotation_date || current.quotation_date,
+        data.valid_until !== undefined ? data.valid_until : current.valid_until,
+        formattedItems.length > 0 ? JSON.stringify(formattedItems) : current.items,
+        subtotal,
+        discountPercent,
+        discountAmount,
+        taxType,
+        taxPercent,
+        taxAmount,
+        totalAmount,
+        data.status || current.status,
+        data.terms_conditions !== undefined ? data.terms_conditions : current.terms_conditions,
+        data.notes !== undefined ? data.notes : current.notes,
+        data.prepared_by !== undefined ? data.prepared_by : current.prepared_by,
+        id
+      ]);
+    } catch (sqlErr) {
+      if (sqlErr.code === 'ER_BAD_FIELD_ERROR') {
+        const fallbackSql = `
+          UPDATE Quotations SET
+            client_name = ?,
+            client_email = ?,
+            client_phone = ?,
+            client_address = ?,
+            client_gst = ?,
+            subject = ?,
+            quotation_date = ?,
+            valid_until = ?,
+            items = ?,
+            subtotal = ?,
+            discount_percent = ?,
+            discount_amount = ?,
+            tax_type = ?,
+            tax_percent = ?,
+            tax_amount = ?,
+            total_amount = ?,
+            status = ?,
+            terms_conditions = ?,
+            notes = ?,
+            prepared_by = ?
+          WHERE id = ?
+        `;
+        await db.query(fallbackSql, [
+          data.client_name || current.client_name,
+          data.client_email !== undefined ? data.client_email : current.client_email,
+          data.client_phone !== undefined ? data.client_phone : current.client_phone,
+          data.client_address !== undefined ? data.client_address : current.client_address,
+          data.client_gst !== undefined ? data.client_gst : current.client_gst,
+          data.subject !== undefined ? data.subject : current.subject,
+          data.quotation_date || current.quotation_date,
+          data.valid_until !== undefined ? data.valid_until : current.valid_until,
+          formattedItems.length > 0 ? JSON.stringify(formattedItems) : current.items,
+          subtotal,
+          discountPercent,
+          discountAmount,
+          taxType,
+          taxPercent,
+          taxAmount,
+          totalAmount,
+          data.status || current.status,
+          data.terms_conditions !== undefined ? data.terms_conditions : current.terms_conditions,
+          data.notes !== undefined ? data.notes : current.notes,
+          data.prepared_by !== undefined ? data.prepared_by : current.prepared_by,
+          id
+        ]);
+      } else {
+        throw sqlErr;
+      }
+    }
 
     response.success = true;
     response.message = 'Quotation updated successfully.';
