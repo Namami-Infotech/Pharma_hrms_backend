@@ -31,6 +31,7 @@ const updateProduct = async (req, res) => {
       unit,
       packaging,
       price,
+      gst,
       product_code,
       hsn,
       category,
@@ -45,6 +46,7 @@ const updateProduct = async (req, res) => {
       ? packaging.trim() 
       : (current.packaging || updatedUnit || '');
     const updatedPrice = price !== undefined ? Math.round(parseFloat(price) * 100) / 100 : current.price;
+    const updatedGst = (gst !== undefined && gst !== null && !isNaN(parseFloat(gst))) ? parseFloat(gst) : (current.gst !== undefined ? current.gst : 5.0);
     const updatedCode = product_code !== undefined ? product_code.trim() : current.product_code;
     const updatedHsn = hsn !== undefined ? hsn.trim() : current.hsn;
     const updatedCategory = category !== undefined ? category.trim() : current.category;
@@ -83,6 +85,7 @@ const updateProduct = async (req, res) => {
         unit = ?,
         packaging = ?,
         price = ?,
+        gst = ?,
         hsn = ?,
         category = ?,
         composition = ?,
@@ -95,6 +98,7 @@ const updateProduct = async (req, res) => {
         updatedUnit,
         updatedPackaging,
         updatedPrice,
+        updatedGst,
         updatedHsn,
         updatedCategory,
         updatedComp,

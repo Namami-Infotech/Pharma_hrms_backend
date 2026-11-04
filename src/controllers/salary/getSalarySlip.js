@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const { calculateWeeklyOffs } = require('./salaryHelper');
 const { ensureCasualLeaveAccrual } = require('../leave/leaveHelper');
 
 const MONTH_NAMES = [
@@ -58,6 +59,17 @@ const getSalarySlip = async (req, res) => {
   const monthName = MONTH_NAMES[monthIndex] || 'MAY';
   const daysInMonth = new Date(year, monthNumber, 0).getDate();
 
+  // 1. Month restriction: only previous completed months
+  // "in salary slip and salary details will come only for previous month from current month"
+  const now = new Date();
+  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const maxAllowedYear = prevDate.getFullYear();
+  const maxAllowedMonth = prevDate.getMonth() + 1;
+  if (year > maxAllowedYear || (year === maxAllowedYear && monthNumber > maxAllowedMonth)) {
+    response.message = 'Salary slip can only be generated for completed months (up to previous month). Current and future months are not completed yet.';
+    return res.status(400).json(response);
+  }
+
   try {
     // 1. Fetch employee details from Employees table
     const [empRows] = await db.query(
@@ -75,9 +87,23 @@ const getSalarySlip = async (req, res) => {
     }
 
     const emp = empRows[0];
+
+    // 2. Joining date check: "joining month se pehle ka generate ni hoga"
+    if (emp.JoinDate) {
+      const jd = new Date(emp.JoinDate);
+      const joinYear = jd.getFullYear();
+      const joinMonth = jd.getMonth() + 1;
+      if (year < joinYear || (year === joinYear && monthNumber < joinMonth)) {
+        const dStr = String(jd.getDate()).padStart(2, '0');
+        const mStr = String(joinMonth).padStart(2, '0');
+        response.message = `Salary slip cannot be generated before employee's joining month (${MONTH_NAMES[joinMonth - 1]} ${joinYear}, Joined: ${dStr}-${mStr}-${joinYear}).`;
+        return res.status(400).json(response);
+      }
+    }
+
     await ensureCasualLeaveAccrual(empId);
 
-    // 2. Check if a pre-computed record exists in salary_records_new
+    // 2. Check if a pre-computed record exists in salary_records_new or defined structure in salary_structure_new
     let record = null;
     try {
       const [recRows] = await db.query(
@@ -87,6 +113,15 @@ const getSalarySlip = async (req, res) => {
         [monthNumber, year, empId]
       );
       if (recRows && recRows.length > 0) record = recRows[0];
+    } catch (_) { }
+
+    let ssStruct = null;
+    try {
+      const [ssRows] = await db.query(
+        `SELECT * FROM salary_structure_new WHERE empId = ? ORDER BY id DESC LIMIT 1`,
+        [empId]
+      );
+      if (ssRows && ssRows.length > 0) ssStruct = ssRows[0];
     } catch (_) { }
 
     // 3. Fetch attendance marked days for that month and year
@@ -146,40 +181,78 @@ const getSalarySlip = async (req, res) => {
       console.warn('Error fetching approved casual leave for salary slip:', leaveErr.message);
     }
 
-    // Determine payableDays:
-    // If client provided a custom override in query or body (e.g., ?days=... or ?payableDays=...), respect it;
-    // Otherwise, use the actual marked attendance days from Attendance!
-    let payableDays = Math.min(daysInMonth, attendanceDays + paidCasualLeaveDays);
+    // 3. Week Off & Working Days Calculation
+    // "employee add pe weekoff add ho rha hai and employee ke weekoff pe basic salary ni cut hogi bt day allowance hogi dA only working days ke liye hai"
+    const weekOffName = emp.WeekOff || 'Sunday';
+    const totalWeeklyOffs = calculateWeeklyOffs(year, monthNumber, weekOffName);
+    const totalWorkingDaysInMonth = Math.max(1, daysInMonth - totalWeeklyOffs);
+
+    let eligibleWeeklyOffs = totalWeeklyOffs;
+    let eligibleWorkingDays = totalWorkingDaysInMonth;
+    if (emp.JoinDate) {
+      const jd = new Date(emp.JoinDate);
+      if (jd.getFullYear() === year && (jd.getMonth() + 1) === monthNumber) {
+        const startDay = jd.getDate();
+        eligibleWeeklyOffs = 0;
+        const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const cleanName = String(weekOffName).toLowerCase().trim();
+        const targetDay = daysOfWeek.indexOf(cleanName) !== -1 ? daysOfWeek.indexOf(cleanName) : 0;
+        for (let d = startDay; d <= daysInMonth; d++) {
+          const dt = new Date(year, monthNumber - 1, d);
+          if (dt.getDay() === targetDay) eligibleWeeklyOffs++;
+        }
+        const totalCalendarDays = daysInMonth - startDay + 1;
+        eligibleWorkingDays = Math.max(1, totalCalendarDays - eligibleWeeklyOffs);
+      }
+    }
+
+    const totalWorkingDaysAttended = attendanceDays + paidCasualLeaveDays;
+
+    // Basic Payable Days: Weekoffs are NOT cut if employee attended work
+    let basicPayableDays = 0;
+    if (totalWorkingDaysAttended > 0) {
+      basicPayableDays = Math.min(daysInMonth, totalWorkingDaysAttended + eligibleWeeklyOffs);
+    }
+
+    // Allow explicit override if provided by client (e.g., ?days=... or ?payableDays=...)
     const explicitDays = query.days ?? query.payableDays ?? body.days ?? body.payableDays;
     if (explicitDays !== undefined && explicitDays !== null && explicitDays !== '') {
       const parsed = parseInt(explicitDays, 10);
       if (!isNaN(parsed) && parsed >= 0) {
-        payableDays = Math.min(parsed, daysInMonth);
+        basicPayableDays = Math.min(parsed, daysInMonth);
       }
     }
 
     // Calculate rates (Monthly Master Rates)
-    const basic = parseFloat(emp.basic_salary) || (record ? parseFloat(record.basic_salary) : 0);
-    const da = parseFloat(emp.da) || 0;
+    const basic = parseFloat(ssStruct?.basic_salary) || parseFloat(emp.basic_salary) || (record ? parseFloat(record.basic_salary) : 0);
+    const da = parseFloat(ssStruct?.da) || parseFloat(emp.da) || 0;
     const basicAndDa = basic + da;
-    const hra = parseFloat(emp.hra) || (record ? parseFloat(record.hra) : 0);
-    const conv = parseFloat(emp.conveyance) || (record ? parseFloat(record.conveyance) : 0);
-    const specialAllow = parseFloat(emp.special_allowance) || (record ? parseFloat(record.special_allowance) : 0);
+    const hra = parseFloat(ssStruct?.hra) || parseFloat(emp.hra) || (record ? parseFloat(record.hra) : 0);
+    const conv = parseFloat(ssStruct?.conveyance) || parseFloat(emp.conveyance) || (record ? parseFloat(record.conveyance) : 0);
+    const specialAllow = parseFloat(ssStruct?.special_allowance) || parseFloat(emp.special_allowance) || (record ? parseFloat(record.special_allowance) : 0);
     const gwrInc = parseFloat(emp.gwr_inc) || 0;
     const performanceBonus = parseFloat(emp.performance_bonus) || 0;
 
     const rateTotal = Math.round(basicAndDa + hra + conv + specialAllow);
 
-    // Day-wise Actual Earnings: (Monthly Component / daysInMonth) * payableDays
-    const dayRatio = daysInMonth > 0 ? (payableDays / daysInMonth) : 0;
+    // Earnings:
+    // Basic, HRA, Conv, Special: calculated on basicPayableDays (weekoffs are NOT cut)
+    const basicDayRatio = daysInMonth > 0 ? (basicPayableDays / daysInMonth) : 0;
 
-    const actualBasic = Math.round(basic * dayRatio);
-    const actualDa = Math.round(da * dayRatio);
-    const actualHra = Math.round(hra * dayRatio);
-    const actualConv = Math.round(conv * dayRatio);
-    const actualSpecialAllow = Math.round(specialAllow * dayRatio);
-    const actualGwrInc = Math.round(gwrInc * dayRatio);
-    const actualPerformanceBonus = Math.round(performanceBonus * dayRatio);
+    const actualBasic = Math.round(basic * basicDayRatio);
+    const actualHra = Math.round(hra * basicDayRatio);
+    const actualConv = Math.round(conv * basicDayRatio);
+    const actualSpecialAllow = Math.round(specialAllow * basicDayRatio);
+    const actualGwrInc = Math.round(gwrInc * basicDayRatio);
+    const actualPerformanceBonus = Math.round(performanceBonus * basicDayRatio);
+
+    // DA (Day Allowance): "bt day allowance hogi dA only working days ke liye hai"
+    // DA is earned strictly on actual working days (attendanceDays), NOT on weekoffs:
+    let actualDa = 0;
+    if (da > 0 && attendanceDays > 0) {
+      const daPerDay = eligibleWorkingDays > 0 ? (da / eligibleWorkingDays) : (da / daysInMonth);
+      actualDa = Math.min(Math.round(da), Math.round(daPerDay * attendanceDays));
+    }
 
     const actualEarningsTotal = actualBasic + actualDa + actualHra + actualConv + actualSpecialAllow + actualGwrInc + actualPerformanceBonus;
     const grossPay = actualEarningsTotal;
@@ -201,21 +274,49 @@ const getSalarySlip = async (req, res) => {
     }
 
     // Deductions (Pro-rated by days and capped at grossPay)
-    const esi = parseFloat(emp.esi_deduction) || (record ? parseFloat(record.esi) : 0);
-    const pf = parseFloat(emp.pf_deduction) || (record ? parseFloat(record.epf) : 0);
+    const esi = parseFloat(ssStruct?.esi) || parseFloat(emp.esi_deduction) || (record ? parseFloat(record.esi) : 0);
+    const pf = parseFloat(ssStruct?.epf) || parseFloat(emp.pf_deduction) || (record ? parseFloat(record.epf) : 0);
     const lwf = parseFloat(emp.lwf) || 0;
     const tds = parseFloat(emp.tds) || 0;
     const advance = approvedAdvance > 0 ? approvedAdvance : (parseFloat(emp.advance) || 0);
 
-    const actualPf = Math.min(grossPay, Math.round(pf * dayRatio));
-    const actualEsi = Math.min(grossPay, Math.round(esi * dayRatio));
-    const actualLwf = Math.min(grossPay, Math.round(lwf * dayRatio));
-    const actualTds = Math.min(grossPay, Math.round(tds * dayRatio));
+    const actualPf = Math.min(grossPay, Math.round(pf * basicDayRatio));
+    const actualEsi = Math.min(grossPay, Math.round(esi * basicDayRatio));
+    const actualLwf = Math.min(grossPay, Math.round(lwf * basicDayRatio));
+    const actualTds = Math.min(grossPay, Math.round(tds * basicDayRatio));
     // When an advance payment is approved for this month, deduct the approved advance amount
-    const actualAdvance = Math.min(grossPay, approvedAdvance > 0 ? Math.round(approvedAdvance) : Math.round(advance * dayRatio));
+    const actualAdvance = Math.min(grossPay, approvedAdvance > 0 ? Math.round(approvedAdvance) : Math.round(advance * basicDayRatio));
 
     const grossDed = Math.min(grossPay, actualPf + actualEsi + actualLwf + actualTds + actualAdvance);
-    const reimbursement = 0;
+
+    // Query approved expenses for this employee for this specific month & year
+    let approvedExpense = 0;
+    try {
+      const [expRows] = await db.query(
+        `SELECT SUM(expenseAmount) AS totalExp 
+         FROM ExpenseDetails 
+         WHERE empId = ? AND MONTH(expenseDate) = ? AND YEAR(expenseDate) = ? AND (LOWER(Status) = 'approved' OR LOWER(Status) = 'cleared')`,
+        [emp.EmpId, monthNumber, year]
+      );
+      if (expRows && expRows.length > 0 && expRows[0].totalExp !== null) {
+        approvedExpense = parseFloat(expRows[0].totalExp) || 0;
+      }
+      if (approvedExpense === 0) {
+        const [expRows2] = await db.query(
+          `SELECT SUM(Amount) AS totalExp 
+           FROM Expenses 
+           WHERE EmpId = ? AND MONTH(BillDate) = ? AND YEAR(BillDate) = ? AND (LOWER(Status) = 'approved' OR LOWER(Status) = 'cleared')`,
+          [emp.EmpId, monthNumber, year]
+        );
+        if (expRows2 && expRows2.length > 0 && expRows2[0].totalExp !== null) {
+          approvedExpense = parseFloat(expRows2[0].totalExp) || 0;
+        }
+      }
+    } catch (expErr) {
+      console.warn('Error fetching approved expenses for salary slip:', expErr.message);
+    }
+
+    const reimbursement = Math.round(approvedExpense);
     const netPay = Math.max(0, grossPay - grossDed + reimbursement);
 
     // Format Dates
@@ -262,8 +363,9 @@ const getSalarySlip = async (req, res) => {
         dob: dobFormatted,
         doj: dojFormatted,
         idNo: emp.PanNumber || emp.AadharNumber || 'A443049039234',
-        payableDays: payableDays,
+        payableDays: basicPayableDays,
         attendanceDays: attendanceDays,
+        weekOffDays: eligibleWeeklyOffs,
         daysInMonth: daysInMonth
       },
 
@@ -306,6 +408,7 @@ const getSalarySlip = async (req, res) => {
         grossPay: grossPay,
         grossDed: grossDed,
         reimbursement: reimbursement,
+        expense: reimbursement,
         netPay: netPay,
         netPayWords: numberToWords(netPay)
       },

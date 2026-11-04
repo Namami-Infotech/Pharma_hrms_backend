@@ -15,6 +15,43 @@ const editEmployee = async (req, res) => {
     return res.json(response);
   }
 
+  if (data.DOB && data.DOB.toString().trim() !== '') {
+    const birthDate = new Date(data.DOB);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    if (age < 18) {
+      response.message = 'Employee must be at least 18 years old.';
+      return res.json(response);
+    }
+  }
+
+  if (data.PanNumber && data.PanNumber.toString().trim() !== '') {
+    const panUpper = data.PanNumber.toString().trim().toUpperCase();
+    if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panUpper)) {
+      response.message = 'Invalid PAN format. Must be 5 letters, 4 digits, and 1 letter (e.g. ABCDE1234F).';
+      return res.json(response);
+    }
+    data.PanNumber = panUpper;
+  }
+
+  if (data.UAN && data.UAN.toString().trim() !== '' && data.UAN.toString().trim() !== '0') {
+    if (!/^\d{12}$/.test(data.UAN.toString().trim())) {
+      response.message = 'UAN must contain exactly 12 digits (or 0 if not applicable).';
+      return res.json(response);
+    }
+  }
+
+  if (data.ESI && data.ESI.toString().trim() !== '' && data.ESI.toString().trim() !== '0') {
+    if (!/^\d{10,17}$/.test(data.ESI.toString().trim())) {
+      response.message = 'ESI must be a valid 17-digit number (or 0 if not applicable).';
+      return res.json(response);
+    }
+  }
+
   const conn = await db.getConnection();
   try {
     const [existRows] = await conn.query(

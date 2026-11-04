@@ -11,27 +11,8 @@ const getNextEmpId = async (req, res) => {
       rows.map(r => (r.EmpId || '').toString().trim().toUpperCase())
     );
 
-    let prefix = requestedPrefix;
+    let prefix = requestedPrefix === 'AP' ? requestedPrefix : 'AP';
     let padLength = 4;
-
-    if (!prefix) {
-      // Pick prefix from the latest added employee
-      if (rows.length > 0) {
-        for (const r of rows) {
-          const m = (r.EmpId || '').toString().trim().match(/^([A-Za-z_]+)([0-9]+)$/);
-          if (m) {
-            prefix = m[1].toUpperCase();
-            padLength = Math.max(m[2].length, 4);
-            break;
-          }
-        }
-      }
-    }
-
-    if (!prefix) {
-      prefix = 'AP';
-      padLength = 4;
-    }
 
     // Find the max number for this prefix
     let maxNum = 0;

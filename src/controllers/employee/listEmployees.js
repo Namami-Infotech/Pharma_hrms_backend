@@ -19,7 +19,7 @@ const listEmployees = async (req, res) => {
       LEFT JOIN EmployeeOffice eo 
         ON (e.OfficeId = eo.id OR e.OfficeId = eo.OfficeId)
       WHERE (e.Tenent_Id = ? OR e.Tenent_Id IS NULL)
-      ORDER BY e.id ASC
+      ORDER BY e.id DESC
     `;
 
     const [employeeData] = await db.query(query, [tenantId]);

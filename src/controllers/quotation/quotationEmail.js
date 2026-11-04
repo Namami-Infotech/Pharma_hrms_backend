@@ -30,9 +30,8 @@ async function sendQuotationEmail(quotation, options = {}) {
   const rowsHtml = items.map((it, idx) => `
     <tr style="border-bottom: 1px solid #e5e7eb; ${idx % 2 === 1 ? 'background-color: #f9fafb;' : ''}">
       <td style="padding: 8px 10px; text-align: center; color: #6b7280; font-size: 12px;">${idx + 1}</td>
-      <td style="padding: 8px 10px; font-weight: 600; color: #111827; font-size: 13px;">${it.description || '—'}</td>
+      <td style="padding: 8px 10px; font-weight: 600; color: #111827; font-size: 13px;">${it.description || '—'}${it.composition ? ` <span style="font-size: 11px; font-weight: normal; color: #4b5563;">(${it.composition})</span>` : ''}</td>
       <td style="padding: 8px 10px; text-align: center; color: #4b5563; font-size: 12px;">${it.hsn || '3004'}</td>
-      <td style="padding: 8px 10px; color: #4b5563; font-size: 12px;">${it.pack || '—'}</td>
       <td style="padding: 8px 10px; text-align: center; font-weight: 700; color: #111827; font-size: 13px;">${it.qty || 0}</td>
       <td style="padding: 8px 10px; text-align: right; color: #374151; font-size: 13px;">₹${parseFloat(it.rate || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
       <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: #8d0638; font-size: 13px;">₹${parseFloat(it.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
@@ -87,12 +86,11 @@ async function sendQuotationEmail(quotation, options = {}) {
             <thead>
               <tr style="background-color: #f3f4f6; border-top: 1px solid #d1d5db; border-bottom: 2px solid #8d0638;">
                 <th style="padding: 10px 8px; text-align: center; color: #374151; font-weight: 700; width: 6%;">#</th>
-                <th style="padding: 10px 8px; text-align: left; color: #374151; font-weight: 700;">Product</th>
-                <th style="padding: 10px 8px; text-align: center; color: #374151; font-weight: 700; width: 12%;">HSN</th>
-                <th style="padding: 10px 8px; text-align: left; color: #374151; font-weight: 700; width: 14%;">Pack</th>
-                <th style="padding: 10px 8px; text-align: center; color: #374151; font-weight: 700; width: 10%;">Qty</th>
-                <th style="padding: 10px 8px; text-align: right; color: #374151; font-weight: 700; width: 15%;">Rate</th>
-                <th style="padding: 10px 8px; text-align: right; color: #374151; font-weight: 700; width: 16%;">Amount</th>
+                <th style="padding: 10px 8px; text-align: left; color: #374151; font-weight: 700;">Product Description</th>
+                <th style="padding: 10px 8px; text-align: center; color: #374151; font-weight: 700; width: 14%;">HSN</th>
+                <th style="padding: 10px 8px; text-align: center; color: #374151; font-weight: 700; width: 12%;">Qty</th>
+                <th style="padding: 10px 8px; text-align: right; color: #374151; font-weight: 700; width: 16%;">Rate</th>
+                <th style="padding: 10px 8px; text-align: right; color: #374151; font-weight: 700; width: 18%;">Amount</th>
               </tr>
             </thead>
             <tbody>

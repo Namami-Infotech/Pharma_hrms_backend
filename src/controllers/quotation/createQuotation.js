@@ -47,44 +47,55 @@ const createQuotation = async (req, res) => {
     }
 
     let calculatedSubtotal = 0;
+    let calculatedTaxAmount = 0;
+    let calculatedTotal = 0;
+
     const formattedItems = items.map((it, idx) => {
       const qty = parseFloat(it.qty) || 0;
       const rate = parseFloat(it.rate) || 0;
       const disc = parseFloat(it.discount) || 0;
+      const gst = it.gst !== undefined ? parseFloat(it.gst) : 5.0;
       const rawAmt = qty * rate;
       const discountVal = (rawAmt * disc) / 100;
-      const netAmt = Math.round((rawAmt - discountVal) * 100) / 100;
+      const taxableAmt = Math.round((rawAmt - discountVal) * 100) / 100;
+      const itemGstAmt = Math.round(((taxableAmt * gst) / 100) * 100) / 100;
+      const netAmt = it.amount !== undefined ? parseFloat(it.amount) : Math.round((taxableAmt + itemGstAmt) * 100) / 100;
 
-      calculatedSubtotal += netAmt;
+      calculatedSubtotal += taxableAmt;
+      calculatedTaxAmount += itemGstAmt;
+      calculatedTotal += netAmt;
 
       return {
         s_no: idx + 1,
         description: it.description || it.item_name || '',
+        composition: it.composition || '',
         hsn: it.hsn || it.hsn_code || '3004',
-        pack: it.pack || it.unit || 'Box',
         qty: qty,
         rate: rate,
         discount: disc,
+        gst: gst,
+        taxable_amount: taxableAmt,
+        tax_amount: itemGstAmt,
         amount: netAmt
       };
     });
 
-    const subtotal = data.subtotal !== undefined ? parseFloat(data.subtotal) : calculatedSubtotal;
+    const subtotal = data.subtotal !== undefined ? parseFloat(data.subtotal) : Math.round(calculatedSubtotal * 100) / 100;
     const discountPercent = parseFloat(data.discount_percent) || 0;
     const discountAmount = data.discount_amount !== undefined 
       ? parseFloat(data.discount_amount) 
       : Math.round(((subtotal * discountPercent) / 100) * 100) / 100;
 
     const afterDiscount = Math.max(0, subtotal - discountAmount);
-    const taxType = (data.tax_type || 'GST').toUpperCase();
-    const taxPercent = data.tax_percent !== undefined ? parseFloat(data.tax_percent) : 12.00;
+    const taxType = (data.tax_type || 'CGST/SGST').toUpperCase();
+    const taxPercent = data.tax_percent !== undefined ? parseFloat(data.tax_percent) : 0;
     const taxAmount = data.tax_amount !== undefined
       ? parseFloat(data.tax_amount)
-      : Math.round(((afterDiscount * taxPercent) / 100) * 100) / 100;
+      : Math.round(calculatedTaxAmount * 100) / 100;
 
     const totalAmount = data.total_amount !== undefined
       ? parseFloat(data.total_amount)
-      : Math.round((afterDiscount + taxAmount) * 100) / 100;
+      : Math.round(calculatedTotal * 100) / 100;
 
     const quotationDate = data.quotation_date || new Date().toISOString().slice(0, 10);
     

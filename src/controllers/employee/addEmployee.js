@@ -8,11 +8,10 @@ const addEmployee = async (req, res) => {
   const EmpId = (data.EmpId || '').toString().trim();
   const Name = (data.Name || '').toString().trim();
   const Password = (data.Password || '').toString();
-  const Shift = (data.Shift || '').toString().trim();
-  const offices = data.Offices || data.offices || [];
+  const Shift = (data.Shift || '9:00 AM - 6:00 PM').toString().trim();
   const Mobile = data.Mobile || '';
   const EmailId = data.EmailId || '';
-  const Role = data.Role || '';
+  const Role = data.Role || data.new_role || '';
   const OTP = data.OTP || null;
   const IsOTPExpired = data.IsOTPExpired || 0;
   const IsGeofence = data.IsGeofence || 0;
@@ -30,7 +29,7 @@ const addEmployee = async (req, res) => {
   const ESI = data.ESI || null;
   const ProbationPeriod = data.ProbationPeriod || null;
   const FatherName = data.FatherName || null;
-  const PanNumber = data.PanNumber || null;
+  const PanNumber = data.PanNumber ? data.PanNumber.toString().trim().toUpperCase() : null;
   const AadharNumber = data.AadharNumber || null;
 
   // Salary fields
@@ -47,14 +46,47 @@ const addEmployee = async (req, res) => {
   const performance_bonus = parseFloat(data.performance_bonus) || 0;
   const gwr_inc = parseFloat(data.gwr_inc) || 0;
 
-  if (!EmpId || !Name || !Password || !Shift || !Array.isArray(offices) || offices.length === 0) {
-    const missing = [];
-    if (!EmpId) missing.push('EmpId');
-    if (!Name) missing.push('Name');
-    if (!Password) missing.push('Password');
-    if (!Shift) missing.push('Shift');
-    if (!offices || offices.length === 0) missing.push('Offices');
+  const requiredFields = {
+    EmpId, Name, Password, Mobile, EmailId, Role, WeekOff,
+    Designation, DOB, JoinDate, UAN, ESI
+  };
+  const missing = Object.keys(requiredFields)
+    .filter((field) => !String(requiredFields[field] || '').trim());
+  if (missing.length > 0) {
     response.message = 'Missing required field(s): ' + missing.join(', ');
+    return res.json(response);
+  }
+  if (!/^\d{10}$/.test(String(Mobile).trim())) {
+    response.message = 'Mobile must contain exactly 10 digits.';
+    return res.json(response);
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(EmailId).trim())) {
+    response.message = 'Please provide a valid email address.';
+    return res.json(response);
+  }
+  if (DOB) {
+    const birthDate = new Date(DOB);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    if (age < 18) {
+      response.message = 'Employee must be at least 18 years old.';
+      return res.json(response);
+    }
+  }
+  if (PanNumber && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(PanNumber)) {
+    response.message = 'Invalid PAN format. Must be 5 letters, 4 digits, and 1 letter (e.g. ABCDE1234F).';
+    return res.json(response);
+  }
+  if (UAN && String(UAN).trim() !== '0' && !/^\d{12}$/.test(String(UAN).trim())) {
+    response.message = 'UAN must contain exactly 12 digits (or 0 if not applicable).';
+    return res.json(response);
+  }
+  if (ESI && String(ESI).trim() !== '0' && !/^\d{10,17}$/.test(String(ESI).trim())) {
+    response.message = 'ESI must be a valid 17-digit number (or 0 if not applicable).';
     return res.json(response);
   }
 
@@ -73,59 +105,7 @@ const addEmployee = async (req, res) => {
 
     await conn.beginTransaction();
 
-    // Map offices
-    const officeIds = [];
-    for (const office of offices) {
-      const officeName = (office.OfficeName || '').trim();
-      const latLong = (office.LatLong || '').trim();
-
-      // 1. Try exact OfficeName and LatLong match
-      let [offRows] = await conn.query(
-        'SELECT id, OfficeId FROM EmployeeOffice WHERE OfficeName = ? AND LatLong = ? LIMIT 1',
-        [officeName, latLong]
-      );
-
-      // 2. Fallback: match by OfficeName alone (case-insensitive)
-      if (!offRows || offRows.length === 0) {
-        [offRows] = await conn.query(
-          'SELECT id, OfficeId FROM EmployeeOffice WHERE TRIM(LOWER(OfficeName)) = TRIM(LOWER(?)) LIMIT 1',
-          [officeName]
-        );
-      }
-
-      // 3. Fallback: match by proximity or numeric LatLong coordinates if provided
-      if ((!offRows || offRows.length === 0) && latLong) {
-        const parts = latLong.split(',');
-        if (parts.length === 2) {
-          const lat = parseFloat(parts[0]);
-          const lon = parseFloat(parts[1]);
-          if (!isNaN(lat) && !isNaN(lon)) {
-            [offRows] = await conn.query(
-              'SELECT id, OfficeId FROM EmployeeOffice WHERE ABS(Latitude - ?) < 0.001 AND ABS(Longitude - ?) < 0.001 LIMIT 1',
-              [lat, lon]
-            );
-          }
-        }
-      }
-
-      // 4. Fallback: match by id or OfficeId if provided in object
-      if ((!offRows || offRows.length === 0) && (office.Id || office.OfficeId || office.id)) {
-        const targetId = office.Id || office.OfficeId || office.id;
-        [offRows] = await conn.query(
-          'SELECT id, OfficeId FROM EmployeeOffice WHERE id = ? OR OfficeId = ? LIMIT 1',
-          [targetId, targetId]
-        );
-      }
-
-      if (!offRows || offRows.length === 0) {
-        throw new Error(`Office not found: ${officeName || 'Unnamed'}`);
-      }
-
-      const matchedId = offRows[0].id || offRows[0].OfficeId || offRows[0].Id;
-      officeIds.push(matchedId);
-    }
-
-    const assignedOfficeId = officeIds.join(',');
+    const assignedOfficeId = null;
     const hashedPassword = hashPassword(Password);
 
     const insertSql = `

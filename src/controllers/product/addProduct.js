@@ -22,6 +22,7 @@ const addProduct = async (req, res) => {
       unit,
       packaging,
       price,
+      gst,
       product_code,
       hsn,
       category,
@@ -55,6 +56,7 @@ const addProduct = async (req, res) => {
     const tenantId = Tenent_Id || 1;
     const finalPackaging = (packaging && packaging.trim()) ? packaging.trim() : (unit ? unit.trim() : '');
     const finalPrice = Math.round(parseFloat(price) * 100) / 100;
+    const finalGst = (gst !== undefined && gst !== null && !isNaN(parseFloat(gst))) ? parseFloat(gst) : 5.0;
     const finalStatus = status === 'Inactive' ? 'Inactive' : 'Active';
     const finalHsn = (hsn && hsn.trim()) ? hsn.trim() : '3004';
     const finalCategory = (category && category.trim()) ? category.trim() : 'General';
@@ -83,15 +85,16 @@ const addProduct = async (req, res) => {
 
     const [result] = await pool.query(
       `INSERT INTO products (
-        product_code, name, unit, packaging, price, hsn, category, 
+        product_code, name, unit, packaging, price, gst, hsn, category, 
         composition, description, status, Tenent_Id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         finalCode,
         name.trim(),
         unit.trim(),
         finalPackaging,
         finalPrice,
+        finalGst,
         finalHsn,
         finalCategory,
         composition ? composition.trim() : '',
