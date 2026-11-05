@@ -232,8 +232,8 @@ const getSalarySlip = async (req, res) => {
     const hra = parseFloat(ssStruct?.hra) || parseFloat(emp.hra) || (record ? parseFloat(record.hra) : 0);
     const conv = parseFloat(ssStruct?.conveyance) || parseFloat(emp.conveyance) || (record ? parseFloat(record.conveyance) : 0);
     const specialAllow = parseFloat(ssStruct?.special_allowance) || parseFloat(emp.special_allowance) || (record ? parseFloat(record.special_allowance) : 0);
-    const gwrInc = parseFloat(emp.gwr_inc) || 0;
-    const performanceBonus = parseFloat(emp.performance_bonus) || 0;
+    const gwrInc = 0;
+    const performanceBonus = 0;
 
     const rateTotal = Math.round(basicAndDa + hra + conv + specialAllow);
 
@@ -245,8 +245,8 @@ const getSalarySlip = async (req, res) => {
     const actualHra = Math.round(hra * basicDayRatio);
     const actualConv = Math.round(conv * basicDayRatio);
     const actualSpecialAllow = Math.round(specialAllow * basicDayRatio);
-    const actualGwrInc = Math.round(gwrInc * basicDayRatio);
-    const actualPerformanceBonus = Math.round(performanceBonus * basicDayRatio);
+    const actualGwrInc = 0;
+    const actualPerformanceBonus = 0;
 
     // DA (Day Allowance): "bt day allowance hogi dA only working days ke liye hai"
     // DA is earned strictly on actual working days (attendanceDays), NOT on weekoffs:
@@ -256,7 +256,7 @@ const getSalarySlip = async (req, res) => {
       actualDa = Math.min(Math.round(da), Math.round(daPerDay * attendanceDays));
     }
 
-    const actualEarningsTotal = actualBasic + actualDa + actualHra + actualConv + actualSpecialAllow + actualGwrInc + actualPerformanceBonus;
+    const actualEarningsTotal = actualBasic + actualDa + actualHra + actualConv + actualSpecialAllow;
     const grossPay = actualEarningsTotal;
 
     // Query approved advance payments for this employee for this specific month & year
@@ -278,18 +278,20 @@ const getSalarySlip = async (req, res) => {
     // Deductions (Pro-rated by days and capped at grossPay)
     const esi = parseFloat(ssStruct?.esi) || parseFloat(emp.esi_deduction) || (record ? parseFloat(record.esi) : 0);
     const pf = parseFloat(ssStruct?.epf) || parseFloat(emp.pf_deduction) || (record ? parseFloat(record.epf) : 0);
+    const otherDeduction = parseFloat(ssStruct?.other_deduction) || parseFloat(emp.other_deduction) || (record ? parseFloat(record.other_deduction) : 0);
     const lwf = parseFloat(emp.lwf) || 0;
     const tds = parseFloat(emp.tds) || 0;
     const advance = approvedAdvance > 0 ? approvedAdvance : (parseFloat(emp.advance) || 0);
 
     const actualPf = Math.min(grossPay, Math.round(pf * basicDayRatio));
     const actualEsi = Math.min(grossPay, Math.round(esi * basicDayRatio));
+    const actualOtherDeduction = Math.min(grossPay, Math.round(otherDeduction * basicDayRatio));
     const actualLwf = Math.min(grossPay, Math.round(lwf * basicDayRatio));
     const actualTds = Math.min(grossPay, Math.round(tds * basicDayRatio));
     // When an advance payment is approved for this month, deduct the approved advance amount
     const actualAdvance = Math.min(grossPay, approvedAdvance > 0 ? Math.round(approvedAdvance) : Math.round(advance * basicDayRatio));
 
-    const grossDed = Math.min(grossPay, actualPf + actualEsi + actualLwf + actualTds + actualAdvance);
+    const grossDed = Math.min(grossPay, actualPf + actualEsi + actualOtherDeduction + actualLwf + actualTds + actualAdvance);
 
     // Query approved expenses for this employee for this specific month & year
     let approvedExpense = 0;
@@ -399,6 +401,8 @@ const getSalarySlip = async (req, res) => {
       deductions: {
         esi: actualEsi,
         pf: actualPf,
+        otherDeduction: actualOtherDeduction,
+        other_deduction: actualOtherDeduction,
         lwf: actualLwf,
         tds: actualTds,
         advance: actualAdvance,

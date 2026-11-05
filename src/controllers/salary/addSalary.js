@@ -21,10 +21,10 @@ const addSalary = async (req, res) => {
         basic_salary, basic_salary_per_annum,
         hra, hra_per_annum, conveyance, conveyance_per_annum,
         special_allowance, special_allowance_per_annum, gross_salary, gross_salary_per_annum,
-        epf, epf_per_annum, esi, esi_per_annum,
+        epf, epf_per_annum, esi, esi_per_annum, other_deduction, other_deduction_per_annum,
         total_benefits, total_benefits_per_annum,
         total_cost_of_company, net_take_home
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         emp_name = VALUES(emp_name),
         designation = VALUES(designation),
@@ -45,11 +45,15 @@ const addSalary = async (req, res) => {
         epf_per_annum = VALUES(epf_per_annum),
         esi = VALUES(esi),
         esi_per_annum = VALUES(esi_per_annum),
+        other_deduction = VALUES(other_deduction),
+        other_deduction_per_annum = VALUES(other_deduction_per_annum),
         total_benefits = VALUES(total_benefits),
         total_benefits_per_annum = VALUES(total_benefits_per_annum),
         total_cost_of_company = VALUES(total_cost_of_company),
         net_take_home = VALUES(net_take_home)
     `;
+
+    const otherDeductionVal = parseFloat(data.other_deduction || data.otherDeduction) || 0;
 
     await db.execute(insertSql, [
       empId,
@@ -72,6 +76,8 @@ const addSalary = async (req, res) => {
       parseFloat(data.epf_per_annum) || 0,
       parseFloat(data.esi) || 0,
       parseFloat(data.esi_per_annum) || 0,
+      otherDeductionVal,
+      otherDeductionVal * 12,
       parseFloat(data.total_benefits) || 0,
       parseFloat(data.total_benefits_per_annum) || 0,
       parseFloat(data.total_cost_of_company) || 0,

@@ -58,7 +58,8 @@ const getSalaryRecords = async (req, res) => {
         COALESCE(ss.conveyance, e.conveyance, 0) as conveyance,
         COALESCE(ss.special_allowance, e.special_allowance, 0) as special_allowance,
         COALESCE(ss.epf, e.pf_deduction, 0) as epf,
-        COALESCE(ss.esi, e.esi_deduction, 0) as esi
+        COALESCE(ss.esi, e.esi_deduction, 0) as esi,
+        COALESCE(ss.other_deduction, e.other_deduction, 0) as other_deduction
       FROM Employees e
       LEFT JOIN salary_structure_new ss ON e.EmpId = ss.empId
       LEFT JOIN salary_structure s_old ON e.EmpId = s_old.EmpId
@@ -240,13 +241,15 @@ const getSalaryRecords = async (req, res) => {
 
       const totalEarning = actualBasic + actualDa + actualHra + actualConv + actualSpecial;
 
-      // 3. Deductions (pro-rated PF, ESI and approved advance)
+      // 3. Deductions (pro-rated PF, ESI, other deductions, and approved advance)
       const epfRate = parseFloat(emp.epf) || Math.round(Math.min(definedBasic, 15000) * 0.12);
       const esiRate = parseFloat(emp.esi) || (definedGross <= 21000 ? Math.round(definedGross * 0.0075) : 0);
+      const otherRate = parseFloat(emp.other_deduction) || 0;
       const actualPf = Math.min(totalEarning, Math.round(epfRate * basicDayRatio));
       const actualEsi = Math.min(totalEarning, Math.round(esiRate * basicDayRatio));
+      const actualOther = Math.min(totalEarning, Math.round(otherRate * basicDayRatio));
       const advanceDeduction = advanceMap[empId] || 0;
-      const totalDeductions = Math.min(totalEarning, actualPf + actualEsi + Math.round(advanceDeduction));
+      const totalDeductions = Math.min(totalEarning, actualPf + actualEsi + actualOther + Math.round(advanceDeduction));
 
       // 4. Employee approved expenses (Reimbursement)
       const approvedExpense = expenseMap[empId] || 0;
@@ -272,7 +275,8 @@ const getSalaryRecords = async (req, res) => {
         TotalGrossSalary: definedGross, // Defined total monthly package (Basic + HRA + DA + Conv. + Special)
         GrossSalary: definedGross,      // Defined gross package alias
         TotalEarning: totalEarning,     // Actual earnings as per attendance, weekoffs & DA rules
-        TotalDeductions: totalDeductions, // Deductions (PF, ESI, Advance)
+        TotalDeductions: totalDeductions, // Deductions (PF, ESI, Other, Advance)
+        OtherDeduction: actualOther,
         Expense: reimbursement,
         Reimbursement: reimbursement,
         NetSalary: netSalary,

@@ -81,14 +81,18 @@ const editEmployee = async (req, res) => {
       }
     }
 
+    if (data.Department === undefined && data.department !== undefined) {
+      data.Department = data.department;
+    }
+
     const updatableFields = [
       'Name', 'Mobile', 'EmailId', 'Role', 'OTP', 'IsOTPExpired',
       'IsGeofence', 'Tenent_Id', 'IsActive', 'RM', 'Shift',
-      'ResetTime', 'DOB', 'JoinDate', 'WeekOff', 'Designation',
+      'ResetTime', 'DOB', 'JoinDate', 'WeekOff', 'Designation', 'Department',
       'Grade', 'UAN', 'ESI', 'ProbationPeriod',
       'FatherName', 'PanNumber', 'AadharNumber',
       'basic_salary', 'da', 'hra', 'conveyance', 'special_allowance',
-      'pf_deduction', 'esi_deduction', 'tds', 'advance', 'lwf',
+      'pf_deduction', 'esi_deduction', 'other_deduction', 'tds', 'advance', 'lwf',
       'performance_bonus', 'gwr_inc'
     ];
 
@@ -134,8 +138,9 @@ const editEmployee = async (req, res) => {
         const specialAllowance = parseFloat(data.special_allowance || 0);
         const pf = parseFloat(data.pf_deduction || data.epf || 0);
         const esi = parseFloat(data.esi_deduction || 0);
+        const otherDeduction = parseFloat(data.other_deduction || 0);
         const grossSalary = basic + da + hra + conveyance + specialAllowance;
-        const netTakeHome = grossSalary - (pf + esi + parseFloat(data.tds || 0) + parseFloat(data.advance || 0) + parseFloat(data.lwf || 0));
+        const netTakeHome = grossSalary - (pf + esi + otherDeduction + parseFloat(data.tds || 0) + parseFloat(data.advance || 0) + parseFloat(data.lwf || 0));
 
         await conn.execute(
           `INSERT INTO salary_structure_new (
@@ -143,9 +148,10 @@ const editEmployee = async (req, res) => {
             basic_salary, basic_salary_per_annum, hra, hra_per_annum,
             conveyance, conveyance_per_annum, special_allowance, special_allowance_per_annum,
             gross_salary, gross_salary_per_annum, epf, epf_per_annum,
-            esi, esi_per_annum, total_benefits, total_benefits_per_annum,
+            esi, esi_per_annum, other_deduction, other_deduction_per_annum,
+            total_benefits, total_benefits_per_annum,
             total_cost_of_company, net_take_home, Tenent_Id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON DUPLICATE KEY UPDATE
             basic_salary = VALUES(basic_salary),
             hra = VALUES(hra),
@@ -154,13 +160,15 @@ const editEmployee = async (req, res) => {
             gross_salary = VALUES(gross_salary),
             epf = VALUES(epf),
             esi = VALUES(esi),
+            other_deduction = VALUES(other_deduction),
+            other_deduction_per_annum = VALUES(other_deduction_per_annum),
             net_take_home = VALUES(net_take_home)`,
           [
-            EmpId, data.Name || '', data.Designation || '', data.Role || '', data.Grade || 'A',
+            EmpId, data.Name || '', data.Designation || '', data.Department || data.department || data.Role || '', data.Grade || 'A',
             basic + da, (basic + da) * 12, hra, hra * 12,
             conveyance, conveyance * 12, specialAllowance, specialAllowance * 12,
             grossSalary, grossSalary * 12, pf, pf * 12,
-            esi, esi * 12, 0, 0,
+            esi, esi * 12, otherDeduction, otherDeduction * 12, 0, 0,
             grossSalary, netTakeHome, data.Tenent_Id || 1
           ]
         );

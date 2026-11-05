@@ -44,7 +44,7 @@ const getProducts = async (req, res) => {
       params.push(term, term, term, term);
     }
 
-    query += ' ORDER BY id DESC';
+    query += ' ORDER BY name ASC';
 
     const [rows] = await pool.query(query, params);
 

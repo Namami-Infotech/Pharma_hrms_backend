@@ -24,6 +24,7 @@ const addEmployee = async (req, res) => {
   const DOB = (data.DOB && data.DOB.toString().trim() !== '') ? data.DOB.toString().trim() : null;
   const WeekOff = data.WeekOff || null;
   const Designation = data.Designation || null;
+  const Department = (data.Department || data.department || '').toString().trim() || null;
   const Grade = data.Grade || null;
   const UAN = data.UAN || null;
   const ESI = data.ESI || null;
@@ -40,6 +41,7 @@ const addEmployee = async (req, res) => {
   const special_allowance = parseFloat(data.special_allowance) || 0;
   const pf_deduction = parseFloat(data.pf_deduction !== undefined ? data.pf_deduction : data.epf) || 0;
   const esi_deduction = parseFloat(data.esi_deduction !== undefined ? data.esi_deduction : data.esi_amount) || 0;
+  const other_deduction = parseFloat(data.other_deduction) || 0;
   const tds = parseFloat(data.tds) || 0;
   const advance = parseFloat(data.advance) || 0;
   const lwf = parseFloat(data.lwf) || 0;
@@ -48,7 +50,7 @@ const addEmployee = async (req, res) => {
 
   const requiredFields = {
     EmpId, Name, Password, Mobile, EmailId, Role, WeekOff,
-    Designation, DOB, JoinDate, UAN, ESI
+    Designation, DOB, JoinDate
   };
   const missing = Object.keys(requiredFields)
     .filter((field) => !String(requiredFields[field] || '').trim());
@@ -81,12 +83,12 @@ const addEmployee = async (req, res) => {
     response.message = 'Invalid PAN format. Must be 5 letters, 4 digits, and 1 letter (e.g. ABCDE1234F).';
     return res.json(response);
   }
-  if (UAN && String(UAN).trim() !== '0' && !/^\d{12}$/.test(String(UAN).trim())) {
-    response.message = 'UAN must contain exactly 12 digits (or 0 if not applicable).';
+  if (UAN && String(UAN).trim() !== '' && String(UAN).trim() !== '0' && !/^\d{12}$/.test(String(UAN).trim())) {
+    response.message = 'UAN must contain exactly 12 digits (or leave blank).';
     return res.json(response);
   }
-  if (ESI && String(ESI).trim() !== '0' && !/^\d{10,17}$/.test(String(ESI).trim())) {
-    response.message = 'ESI must be a valid 17-digit number (or 0 if not applicable).';
+  if (ESI && String(ESI).trim() !== '' && String(ESI).trim() !== '0' && !/^\d{10,17}$/.test(String(ESI).trim())) {
+    response.message = 'ESI must be a valid number (or leave blank).';
     return res.json(response);
   }
 
@@ -110,8 +112,8 @@ const addEmployee = async (req, res) => {
 
     const insertSql = `
       INSERT INTO Employees 
-      (EmpId, Name, Password, Mobile, EmailId, Role, OTP, IsOTPExpired, IsGeofence, Tenent_Id, IsActive, CreateDate, RM, Shift, ResetTime, DOB, JoinDate, OfficeId, WeekOff, Designation, Grade, UAN, ESI, ProbationPeriod, FatherName, PanNumber, AadharNumber, basic_salary, da, hra, conveyance, special_allowance, pf_deduction, esi_deduction, tds, advance, lwf, performance_bonus, gwr_inc) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (EmpId, Name, Password, Mobile, EmailId, Role, OTP, IsOTPExpired, IsGeofence, Tenent_Id, IsActive, CreateDate, RM, Shift, ResetTime, DOB, JoinDate, OfficeId, WeekOff, Designation, Department, Grade, UAN, ESI, ProbationPeriod, FatherName, PanNumber, AadharNumber, basic_salary, da, hra, conveyance, special_allowance, pf_deduction, esi_deduction, other_deduction, tds, advance, lwf, performance_bonus, gwr_inc) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     await conn.execute(insertSql, [
@@ -135,6 +137,7 @@ const addEmployee = async (req, res) => {
       assignedOfficeId,
       WeekOff,
       Designation,
+      Department,
       Grade,
       UAN,
       ESI,
@@ -149,6 +152,7 @@ const addEmployee = async (req, res) => {
       special_allowance,
       pf_deduction,
       esi_deduction,
+      other_deduction,
       tds,
       advance,
       lwf,
@@ -158,7 +162,7 @@ const addEmployee = async (req, res) => {
 
     // Also sync to salary_structure_new
     const grossSalary = basic_salary + da + hra + conveyance + special_allowance;
-    const totalDeductions = pf_deduction + esi_deduction + tds + advance + lwf;
+    const totalDeductions = pf_deduction + esi_deduction + other_deduction + tds + advance + lwf;
     const netSalary = grossSalary - totalDeductions;
 
     try {
@@ -168,9 +172,10 @@ const addEmployee = async (req, res) => {
           basic_salary, basic_salary_per_annum, hra, hra_per_annum,
           conveyance, conveyance_per_annum, special_allowance, special_allowance_per_annum,
           gross_salary, gross_salary_per_annum, epf, epf_per_annum,
-          esi, esi_per_annum, total_benefits, total_benefits_per_annum,
+          esi, esi_per_annum, other_deduction, other_deduction_per_annum,
+          total_benefits, total_benefits_per_annum,
           total_cost_of_company, net_take_home, Tenent_Id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           emp_name = VALUES(emp_name),
           designation = VALUES(designation),
@@ -183,14 +188,16 @@ const addEmployee = async (req, res) => {
           gross_salary = VALUES(gross_salary),
           epf = VALUES(epf),
           esi = VALUES(esi),
+          other_deduction = VALUES(other_deduction),
+          other_deduction_per_annum = VALUES(other_deduction_per_annum),
           net_take_home = VALUES(net_take_home)`,
         [
-          EmpId, Name, Designation || '', Role || '', Grade || 'A', JoinDate || null,
+          EmpId, Name, Designation || '', Department || Role || '', Grade || 'A', JoinDate || null,
           basic_salary + da, (basic_salary + da) * 12, hra, hra * 12,
           conveyance, conveyance * 12, special_allowance, special_allowance * 12,
           grossSalary, grossSalary * 12, pf_deduction, pf_deduction * 12,
-          esi_deduction, esi_deduction * 12, 0, 0,
-          grossSalary, netSalary, Tenent_Id || 1
+          esi_deduction, esi_deduction * 12, other_deduction, other_deduction * 12,
+          0, 0, grossSalary, netSalary, Tenent_Id || 1
         ]
       );
     } catch (_) {}
