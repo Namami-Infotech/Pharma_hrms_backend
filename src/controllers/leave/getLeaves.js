@@ -47,7 +47,8 @@ const getLeaves = async (req, res) => {
       response.success = true;
       response.data = normalizedRows;
     } else {
-      response.message = 'No tickets found.';
+      response.success = true;
+      response.data = [];
     }
 
     return res.json(response);

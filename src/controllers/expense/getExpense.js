@@ -40,7 +40,8 @@ const getExpense = async (req, res) => {
       response.success = true;
       response.data = rows;
     } else {
-      response.message = 'No expenses found for the given Employee ID.';
+      response.success = true;
+      response.data = [];
     }
 
     return res.json(response);

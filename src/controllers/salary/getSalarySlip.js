@@ -250,10 +250,17 @@ const getSalarySlip = async (req, res) => {
 
     // DA (Day Allowance): "bt day allowance hogi dA only working days ke liye hai"
     // DA is earned strictly on actual working days (attendanceDays), NOT on weekoffs:
+    // let actualDa = 0;
+    // if (da > 0 && attendanceDays > 0) {
+    //   const daPerDay = eligibleWorkingDays > 0 ? (da * eligibleWorkingDays) : (da * daysInMonth);
+    //   actualDa = Math.min(Math.round(da), Math.round(daPerDay * attendanceDays));
+    // }
+
+    // DA is already stored as a per-day amount in DB
     let actualDa = 0;
+
     if (da > 0 && attendanceDays > 0) {
-      const daPerDay = eligibleWorkingDays > 0 ? (da / eligibleWorkingDays) : (da / daysInMonth);
-      actualDa = Math.min(Math.round(da), Math.round(daPerDay * attendanceDays));
+        actualDa = Math.round(da * attendanceDays);
     }
 
     const actualEarningsTotal = actualBasic + actualDa + actualHra + actualConv + actualSpecialAllow;
