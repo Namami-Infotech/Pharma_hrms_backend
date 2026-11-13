@@ -20,6 +20,10 @@ router.post(['/change_password.php', '/change_password'], authController.changeP
 // POST /auth/forget_password.php
 router.post(['/forget_password.php', '/forget_password'], authController.forgetPassword);
 
+// GET & POST /auth/test_mail.php (Instant mailer diagnostic test)
+router.get(['/test_mail.php', '/test_mail'], authController.testMail);
+router.post(['/test_mail.php', '/test_mail'], authController.testMail);
+
 // GET & POST /auth/get_office_details.php (and /office_details_function.php)
 router.get(['/get_office_details.php', '/get_office_details', '/office_details_function.php', '/office_details_function'], authController.getOfficeDetails);
 router.post(['/get_office_details.php', '/get_office_details', '/office_details_function.php', '/office_details_function'], authController.getOfficeDetails);

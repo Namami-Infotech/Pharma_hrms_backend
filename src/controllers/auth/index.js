@@ -6,6 +6,7 @@ const changePassword = require('./changePassword');
 const forgetPassword = require('./forgetPassword');
 const getOfficeDetails = require('./getOfficeDetails');
 const getMenuByTenent = require('./getMenuByTenent');
+const testMail = require('./testMail');
 const authHelper = require('./authHelper');
 
 module.exports = {
@@ -17,5 +18,6 @@ module.exports = {
   forgetPassword,
   getOfficeDetails,
   getMenuByTenent,
+  testMail,
   ...authHelper
 };
