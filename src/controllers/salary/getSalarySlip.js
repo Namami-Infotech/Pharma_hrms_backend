@@ -1,5 +1,4 @@
 const db = require('../../config/db');
-const { calculateWeeklyOffs } = require('./salaryHelper');
 const { ensureCasualLeaveAccrual } = require('../leave/leaveHelper');
 
 const MONTH_NAMES = [
@@ -27,6 +26,22 @@ const numberToWords = (num) => {
   const val = Math.round(Number(num) || 0);
   if (val <= 0) return 'Zero Rupees Only';
   return (inWords(val) + ' Rupees Only');
+};
+
+const toDateKey = (value) => {
+  const key = value instanceof Date
+    ? `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+    : String(value || '').slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
+};
+
+const addDateRange = (dates, startDate, endDate) => {
+  const current = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  while (current <= end) {
+    dates.add(current.toISOString().slice(0, 10));
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
 };
 
 const getSalarySlip = async (req, res) => {
@@ -58,6 +73,8 @@ const getSalarySlip = async (req, res) => {
   const monthNumber = monthIndex + 1;
   const monthName = MONTH_NAMES[monthIndex] || 'MAY';
   const daysInMonth = new Date(year, monthNumber, 0).getDate();
+  const firstDay = `${year}-${String(monthNumber).padStart(2, '0')}-01`;
+  const lastDay = `${year}-${String(monthNumber).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
 
   // 1. Month restriction: only previous completed months
   // "in salary slip and salary details will come only for previous month from current month"
@@ -75,7 +92,7 @@ const getSalarySlip = async (req, res) => {
   try {
     // 1. Fetch employee details from Employees table
     const [empRows] = await db.query(
-      `SELECT e.*, eo.OfficeName, eo.OfficeAddress
+      `SELECT e.*, DATE_FORMAT(e.JoinDate, '%Y-%m-%d') AS joinDateKey, eo.OfficeName, eo.OfficeAddress
        FROM Employees e
        LEFT JOIN EmployeeOffice eo ON (e.OfficeId = eo.id OR e.OfficeId = eo.OfficeId)
        WHERE e.EmpId = ?
@@ -128,10 +145,10 @@ const getSalarySlip = async (req, res) => {
 
     // 3. Fetch attendance marked days for that month and year
     // Query Attendance table directly (with lowercase/uppercase fallback)
-    let attendanceDays = 0;
+    const attendanceDateKeys = new Set();
     try {
       const [attRows] = await db.query(
-        `SELECT COUNT(DISTINCT att_date) as presentCount FROM (
+        `SELECT DISTINCT DATE_FORMAT(att_date, '%Y-%m-%d') AS attendanceDate FROM (
            SELECT Date as att_date FROM Attendance 
            WHERE EmpId = ? AND MONTH(Date) = ? AND YEAR(Date) = ? AND (Status IS NULL OR LOWER(Status) != 'absent')
            UNION
@@ -141,14 +158,15 @@ const getSalarySlip = async (req, res) => {
          WHERE att_date IS NOT NULL`,
         [empId, monthNumber, year, empId, monthNumber, year]
       );
-      if (attRows && attRows[0] && attRows[0].presentCount !== undefined) {
-        attendanceDays = parseInt(attRows[0].presentCount, 10) || 0;
+      for (const row of attRows) {
+        const dateKey = toDateKey(row.attendanceDate);
+        if (dateKey) attendanceDateKeys.add(dateKey);
       }
     } catch (attErr) {
       // Fallback for Linux lowercase 'attendance' table
       try {
         const [attRowsLower] = await db.query(
-          `SELECT COUNT(DISTINCT att_date) as presentCount FROM (
+          `SELECT DISTINCT DATE_FORMAT(att_date, '%Y-%m-%d') AS attendanceDate FROM (
              SELECT Date as att_date FROM attendance 
              WHERE EmpId = ? AND MONTH(Date) = ? AND YEAR(Date) = ? AND (Status IS NULL OR LOWER(Status) != 'absent')
              UNION
@@ -158,62 +176,80 @@ const getSalarySlip = async (req, res) => {
            WHERE att_date IS NOT NULL`,
           [empId, monthNumber, year, empId, monthNumber, year]
         );
-        if (attRowsLower && attRowsLower[0] && attRowsLower[0].presentCount !== undefined) {
-          attendanceDays = parseInt(attRowsLower[0].presentCount, 10) || 0;
+        for (const row of attRowsLower) {
+          const dateKey = toDateKey(row.attendanceDate);
+          if (dateKey) attendanceDateKeys.add(dateKey);
         }
       } catch (err2) {
         console.error('Error fetching attendance days:', err2.message);
       }
     }
 
-    let paidCasualLeaveDays = 0;
+    const joinDateKey = toDateKey(emp.joinDateKey || emp.JoinDate);
+    const firstEligibleDate = joinDateKey && joinDateKey > firstDay ? joinDateKey : firstDay;
+    const eligibleAttendanceDateKeys = new Set(
+      [...attendanceDateKeys].filter(dateKey => dateKey >= firstEligibleDate && dateKey <= lastDay)
+    );
+    const attendanceDays = eligibleAttendanceDateKeys.size;
+
+    const paidCasualLeaveDateKeys = new Set();
     try {
       const [leaveRows] = await db.query(
-        `SELECT SUM(
-           DATEDIFF(LEAST(?, EndDate), GREATEST(?, StartDate)) + 1
-         ) AS leaveDays
+        `SELECT DATE_FORMAT(StartDate, '%Y-%m-%d') AS StartDate,
+                DATE_FORMAT(EndDate, '%Y-%m-%d') AS EndDate
          FROM Leaves
          WHERE EmpId = ? AND category = 'CL' AND Status = 'Approved'
            AND StartDate <= ? AND EndDate >= ?`,
-        [`${year}-${String(monthNumber).padStart(2, '0')}-${daysInMonth}`, `${year}-${String(monthNumber).padStart(2, '0')}-01`, empId,
-          `${year}-${String(monthNumber).padStart(2, '0')}-${daysInMonth}`, `${year}-${String(monthNumber).padStart(2, '0')}-01`]
+        [empId, lastDay, firstDay]
       );
-      paidCasualLeaveDays = parseInt(leaveRows[0]?.leaveDays, 10) || 0;
+      for (const leave of leaveRows) {
+        const startDate = toDateKey(leave.StartDate);
+        const endDate = toDateKey(leave.EndDate);
+        if (startDate && endDate) {
+          const clippedStart = startDate > firstEligibleDate ? startDate : firstEligibleDate;
+          const clippedEnd = endDate < lastDay ? endDate : lastDay;
+          if (clippedStart <= clippedEnd) addDateRange(paidCasualLeaveDateKeys, clippedStart, clippedEnd);
+        }
+      }
     } catch (leaveErr) {
       console.warn('Error fetching approved casual leave for salary slip:', leaveErr.message);
     }
 
     // 3. Week Off & Working Days Calculation
-    // "employee add pe weekoff add ho rha hai and employee ke weekoff pe basic salary ni cut hogi bt day allowance hogi dA only working days ke liye hai"
     const weekOffName = emp.WeekOff || 'Sunday';
-    const totalWeeklyOffs = calculateWeeklyOffs(year, monthNumber, weekOffName);
-    const totalWorkingDaysInMonth = Math.max(1, daysInMonth - totalWeeklyOffs);
-
-    let eligibleWeeklyOffs = totalWeeklyOffs;
-    let eligibleWorkingDays = totalWorkingDaysInMonth;
-    if (emp.JoinDate) {
-      const jd = new Date(emp.JoinDate);
-      if (jd.getFullYear() === year && (jd.getMonth() + 1) === monthNumber) {
-        const startDay = jd.getDate();
-        eligibleWeeklyOffs = 0;
-        const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        const cleanName = String(weekOffName).toLowerCase().trim();
-        const targetDay = daysOfWeek.indexOf(cleanName) !== -1 ? daysOfWeek.indexOf(cleanName) : 0;
-        for (let d = startDay; d <= daysInMonth; d++) {
-          const dt = new Date(year, monthNumber - 1, d);
-          if (dt.getDay() === targetDay) eligibleWeeklyOffs++;
-        }
-        const totalCalendarDays = daysInMonth - startDay + 1;
-        eligibleWorkingDays = Math.max(1, totalCalendarDays - eligibleWeeklyOffs);
+    const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const cleanWeekOffName = String(weekOffName).toLowerCase().trim();
+    const weekOffDay = daysOfWeek.indexOf(cleanWeekOffName);
+    const weekOffDateKeys = new Set();
+    const firstEligibleDay = parseInt(firstEligibleDate.slice(8, 10), 10);
+    for (let day = firstEligibleDay; day <= daysInMonth; day++) {
+      const date = new Date(year, monthNumber - 1, day);
+      if (date.getDay() === (weekOffDay === -1 ? 0 : weekOffDay)) {
+        weekOffDateKeys.add(`${year}-${String(monthNumber).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
       }
     }
+    const eligibleWeeklyOffs = weekOffDateKeys.size;
 
-    const totalWorkingDaysAttended = attendanceDays + paidCasualLeaveDays;
+    const [holidayRows] = await db.query(
+      `SELECT DISTINCT DATE_FORMAT(date, '%Y-%m-%d') AS holidayDate
+       FROM Holidays
+       WHERE date BETWEEN ? AND ?`,
+      [firstEligibleDate, lastDay]
+    );
+    const holidayDateKeys = new Set();
+    for (const holiday of holidayRows) {
+      const dateKey = toDateKey(holiday.holidayDate);
+      if (dateKey) holidayDateKeys.add(dateKey);
+    }
 
-    // Basic Payable Days: Weekoffs are NOT cut if employee attended work
+    // Pay each calendar date once, even when attendance overlaps leave, a weekly off, or a holiday.
+    const paidDateKeys = new Set([...eligibleAttendanceDateKeys, ...paidCasualLeaveDateKeys]);
     let basicPayableDays = 0;
-    if (totalWorkingDaysAttended > 0) {
-      basicPayableDays = Math.min(daysInMonth, totalWorkingDaysAttended + eligibleWeeklyOffs);
+    if (paidDateKeys.size > 0) {
+      for (const dates of [weekOffDateKeys, holidayDateKeys]) {
+        for (const dateKey of dates) paidDateKeys.add(dateKey);
+      }
+      basicPayableDays = Math.min(daysInMonth, paidDateKeys.size);
     }
 
     // Allow explicit override if provided by client (e.g., ?days=... or ?payableDays=...)
