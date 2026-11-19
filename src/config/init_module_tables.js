@@ -1,7 +1,7 @@
 const db = require('./db');
 
 async function initModuleTables() {
-  console.log('[Migration] Creating modules and role_permissions tables...');
+  // console.log('[Migration] Creating modules and role_permissions tables...');
 
   // 1. Create modules table
   await db.query(`

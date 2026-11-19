@@ -51,7 +51,7 @@ const markAttendance = async (req, res) => {
       if (meridiem.toLowerCase() === 'am' && mobileHour === 12) mobileHour = 0;
     }
 
-    if (mobileHour >= 10) {
+    if (Event === 'In' && mobileHour >= 10) {
       return res.json({
         success: false,
         message: "You're delay, kindly contact with admin for attendance"
