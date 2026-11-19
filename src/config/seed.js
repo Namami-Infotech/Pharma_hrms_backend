@@ -181,81 +181,81 @@ async function seedDatabase() {
     }
 
     // Step 4: Seed Users / Employees
-    for (const user of SEED_USERS) {
-      const hashedPassword = bcrypt.hashSync(user.PlainPassword, 10);
-      try {
-        const [existing] = await db.query(
-          `SELECT EmpId FROM ${employeesTable} WHERE EmpId = ? LIMIT 1`,
-          [user.EmpId]
-        );
+    // for (const user of SEED_USERS) {
+    //   const hashedPassword = bcrypt.hashSync(user.PlainPassword, 10);
+    //   try {
+    //     const [existing] = await db.query(
+    //       `SELECT EmpId FROM ${employeesTable} WHERE EmpId = ? LIMIT 1`,
+    //       [user.EmpId]
+    //     );
 
-        if (!existing || existing.length === 0) {
-          // Insert new user
-          await db.execute(
-            `INSERT INTO ${employeesTable} 
-             (EmpId, Name, EmailId, Mobile, Password, Role, Designation, Department, OfficeId, RM, Shift, ResetTime, Tenent_Id, IsActive) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              user.EmpId,
-              user.Name,
-              user.EmailId,
-              user.Mobile,
-              hashedPassword,
-              user.Role,
-              user.Designation,
-              user.Department,
-              user.OfficeId,
-              user.RM,
-              user.Shift,
-              user.ResetTime,
-              user.Tenent_Id,
-              user.IsActive
-            ]
-          );
-          console.log(`[Database Seeder] ✓ User '${user.Name}' (${user.EmpId} - ${user.Role}) created.`);
-        } else {
-          // Update credentials and essential fields so known passwords always work
-          await db.execute(
-            `UPDATE ${employeesTable} 
-             SET Password = ?, IsActive = 1, Role = ?, Name = ?, EmailId = ?, Mobile = ?, OfficeId = ?, Shift = ?, ResetTime = ?
-             WHERE EmpId = ?`,
-            [
-              hashedPassword,
-              user.Role,
-              user.Name,
-              user.EmailId,
-              user.Mobile,
-              user.OfficeId,
-              user.Shift,
-              user.ResetTime,
-              user.EmpId
-            ]
-          );
-          console.log(`[Database Seeder] ✓ User '${user.Name}' (${user.EmpId}) verified & credentials updated.`);
-        }
+    //     if (!existing || existing.length === 0) {
+    //       // Insert new user
+    //       await db.execute(
+    //         `INSERT INTO ${employeesTable} 
+    //          (EmpId, Name, EmailId, Mobile, Password, Role, Designation, Department, OfficeId, RM, Shift, ResetTime, Tenent_Id, IsActive) 
+    //          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    //         [
+    //           user.EmpId,
+    //           user.Name,
+    //           user.EmailId,
+    //           user.Mobile,
+    //           hashedPassword,
+    //           user.Role,
+    //           user.Designation,
+    //           user.Department,
+    //           user.OfficeId,
+    //           user.RM,
+    //           user.Shift,
+    //           user.ResetTime,
+    //           user.Tenent_Id,
+    //           user.IsActive
+    //         ]
+    //       );
+    //       console.log(`[Database Seeder] ✓ User '${user.Name}' (${user.EmpId} - ${user.Role}) created.`);
+    //     } else {
+    //       // Update credentials and essential fields so known passwords always work
+    //       await db.execute(
+    //         `UPDATE ${employeesTable} 
+    //          SET Password = ?, IsActive = 1, Role = ?, Name = ?, EmailId = ?, Mobile = ?, OfficeId = ?, Shift = ?, ResetTime = ?
+    //          WHERE EmpId = ?`,
+    //         [
+    //           hashedPassword,
+    //           user.Role,
+    //           user.Name,
+    //           user.EmailId,
+    //           user.Mobile,
+    //           user.OfficeId,
+    //           user.Shift,
+    //           user.ResetTime,
+    //           user.EmpId
+    //         ]
+    //       );
+    //       console.log(`[Database Seeder] ✓ User '${user.Name}' (${user.EmpId}) verified & credentials updated.`);
+    //     }
 
-        // Step 5: Ensure EmployeeLeave record exists
-        try {
-          const [existingLeave] = await db.query(
-            `SELECT id FROM ${employeeLeaveTable} WHERE EmpId = ? LIMIT 1`,
-            [user.EmpId]
-          );
-          if (!existingLeave || existingLeave.length === 0) {
-            await db.execute(
-              `INSERT INTO ${employeeLeaveTable} 
-               (EmpId, LeaveType, TotalLeave, BalanceLeave, Tenent_Id, SL, EL, CL) 
-               VALUES (?, 'Annual', 39, 39, ?, 12, 15, 12)`,
-              [user.EmpId, user.Tenent_Id]
-            );
-          }
-        } catch (leaveErr) {
-          // Non-blocking if table or fields differ
-        }
+    //     // Step 5: Ensure EmployeeLeave record exists
+    //     try {
+    //       const [existingLeave] = await db.query(
+    //         `SELECT id FROM ${employeeLeaveTable} WHERE EmpId = ? LIMIT 1`,
+    //         [user.EmpId]
+    //       );
+    //       if (!existingLeave || existingLeave.length === 0) {
+    //         await db.execute(
+    //           `INSERT INTO ${employeeLeaveTable} 
+    //            (EmpId, LeaveType, TotalLeave, BalanceLeave, Tenent_Id, SL, EL, CL) 
+    //            VALUES (?, 'Annual', 39, 39, ?, 12, 15, 12)`,
+    //           [user.EmpId, user.Tenent_Id]
+    //         );
+    //       }
+    //     } catch (leaveErr) {
+    //       // Non-blocking if table or fields differ
+    //     }
 
-      } catch (err) {
-        console.warn(`[Database Seeder] Error seeding user ${user.EmpId}:`, err.message);
-      }
-    }
+    //   } catch (err) {
+    //     console.warn(`[Database Seeder] Error seeding user ${user.EmpId}:`, err.message);
+    //   }
+    // }
 
     // Step 6: Seed sample holidays if empty
     try {

@@ -42,6 +42,23 @@ const markAttendance = async (req, res) => {
     Event = 'Out';
   }
 
+  const timeMatch = MobileDateTime.toString().match(/(?:T|\s)(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*([AaPp][Mm]))?/);
+  if (timeMatch) {
+    let mobileHour = parseInt(timeMatch[1], 10);
+    const meridiem = timeMatch[4];
+    if (meridiem) {
+      if (meridiem.toLowerCase() === 'pm' && mobileHour !== 12) mobileHour += 12;
+      if (meridiem.toLowerCase() === 'am' && mobileHour === 12) mobileHour = 0;
+    }
+
+    if (mobileHour >= 10) {
+      return res.json({
+        success: false,
+        message: "You're delay, kindly contact with admin for attendance"
+      });
+    }
+  }
+
   const currentDate = new Date(MobileDateTime).toISOString().slice(0, 10);
 
   try {
