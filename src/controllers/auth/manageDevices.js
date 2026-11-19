@@ -114,3 +114,4 @@ const manageDevices = async (req, res) => {
 };
 
 module.exports = manageDevices;
+

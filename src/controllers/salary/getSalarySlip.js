@@ -234,8 +234,11 @@ const getSalarySlip = async (req, res) => {
     const specialAllow = parseFloat(ssStruct?.special_allowance) || parseFloat(emp.special_allowance) || (record ? parseFloat(record.special_allowance) : 0);
     const gwrInc = 0;
     const performanceBonus = 0;
+    
 
-    const rateTotal = Math.round(basicAndDa + hra + conv + specialAllow);
+    // Total rate section added 
+    // kjdsadskldsadksadaskdl
+    const rateTotal = Math.round(basic + hra + conv + specialAllow);
 
     // Earnings:
     // Basic, HRA, Conv, Special: calculated on basicPayableDays (weekoffs are NOT cut)
