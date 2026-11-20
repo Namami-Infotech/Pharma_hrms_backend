@@ -21,8 +21,8 @@ async function syncAttendance(db, targetEmpId = null, targetDate = null) {
       params.push(targetEmpId);
     }
     if (targetDate) {
-      conditions.push('COALESCE(DATE(MobileDateTime), Date) = ?');
-      params.push(targetDate);
+      conditions.push('(Date = ? OR DATE(MobileDateTime) = ? OR DATE(create_time) = ? OR DATE(ServerDateTime) = ?)');
+      params.push(targetDate, targetDate, targetDate, targetDate);
     }
 
     if (conditions.length > 0) {
@@ -35,8 +35,8 @@ async function syncAttendance(db, targetEmpId = null, targetDate = null) {
 
     const byEmpDate = {};
     for (const act of activities) {
-      const actDate = (act.MobileDateTime ? act.MobileDateTime.slice(0, 10) : null) ||
-        act.Date ||
+      const actDate = act.Date || 
+        (act.MobileDateTime ? act.MobileDateTime.slice(0, 10) : null) || 
         (act.create_time ? act.create_time.slice(0, 10) : null) || 
         (act.ServerDateTime ? act.ServerDateTime.slice(0, 10) : null);
 

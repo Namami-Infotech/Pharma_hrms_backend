@@ -32,13 +32,14 @@ const getTodayAttendance = async (req, res) => {
 
     let querySql = `
       SELECT DISTINCT EmpId FROM (
-         SELECT EmpId FROM Activity WHERE COALESCE(DATE(MobileDateTime), Date) = ?
+         SELECT EmpId FROM Activity WHERE (DATE(MobileDateTime) = ? OR Date = ? OR DATE(create_time) = ? OR DATE(ServerDateTime) = ?)
          UNION
          SELECT EmpId FROM Attendance WHERE (Date = ? OR DateTime = ?)
       ) AS combined_emps
     `;
-    let queryParams = [inputDate, inputDate, inputDate];
-
+    let queryParams = [inputDate, inputDate, inputDate, inputDate, inputDate, inputDate];
+  //  Ye av fix hua hai
+  
     if (!isAdmin && empIdParam) {
       // Find subordinate IDs if user is an RM
       const [subRows] = await db.query(
@@ -76,9 +77,9 @@ const getTodayAttendance = async (req, res) => {
         const [records] = await db.query(
           `SELECT ActivityId, EmpId, Event, GeoLocation, MobileDateTime, Time, Date, create_time, ServerDateTime 
            FROM Activity 
-           WHERE EmpId = ? AND COALESCE(DATE(MobileDateTime), Date) = ? 
+           WHERE EmpId = ? AND (DATE(MobileDateTime) = ? OR Date = ? OR DATE(create_time) = ? OR DATE(ServerDateTime) = ?) 
            ORDER BY COALESCE(MobileDateTime, CONCAT(Date, ' ', Time), create_time, ServerDateTime) ASC`,
-          [empId, inputDate]
+          [empId, inputDate, inputDate, inputDate, inputDate]
         );
 
         // Fetch attendance record
