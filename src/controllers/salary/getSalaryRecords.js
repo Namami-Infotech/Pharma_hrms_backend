@@ -213,7 +213,7 @@ const getSalaryRecords = async (req, res) => {
       let definedHra = parseFloat(emp.hra) || 0;
       let definedConv = parseFloat(emp.conveyance) || 0;
       let definedSpecial = parseFloat(emp.special_allowance) || 0;
-      let definedGross = parseFloat(emp.ss_gross) || Math.round(definedBasic + definedDa + definedHra + definedConv + definedSpecial);
+      let definedGross = Math.round(definedBasic + definedHra + definedConv + definedSpecial);
 
       if (definedGross === 0) {
         // Fallback default defined package for staff without explicit salary structure
@@ -223,6 +223,7 @@ const getSalaryRecords = async (req, res) => {
         definedSpecial = Math.round(definedBasic * 0.1);
         definedGross = definedBasic + definedHra + definedConv + definedSpecial;
       }
+
 
       // 2. Actual Earnings:
       // Basic, HRA, Conv, Special allowance: payable on basicPayableDays (weekoff NOT cut)
@@ -272,7 +273,7 @@ const getSalaryRecords = async (req, res) => {
         LeaveDays: paidLeaveDays,
         WeekOffDays: eligibleWeeklyOffs,
         PaidDays: basicPayableDays,
-        TotalGrossSalary: definedGross, // Defined total monthly package (Basic + HRA + DA + Conv. + Special)
+        TotalGrossSalary: definedGross, // Gross package excluding DA (Basic + HRA + Conv. + Special)
         GrossSalary: definedGross,      // Defined gross package alias
         TotalEarning: totalEarning,     // Actual earnings as per attendance, weekoffs & DA rules
         TotalDeductions: totalDeductions, // Deductions (PF, ESI, Other, Advance)
