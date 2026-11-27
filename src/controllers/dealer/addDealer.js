@@ -36,7 +36,7 @@ const addDealer = async (req, res) => {
         if (foundKey && data[foundKey]) return String(data[foundKey]);
       }
       // Also check if any checkpoint whose description matches fallbackNames exists in checkpointsData
-      const matchingChk = checkpoints.find(c => 
+      const matchingChk = checkpoints.find(c =>
         fallbackNames.some(fn => c.Description.toLowerCase() === fn.toLowerCase() || c.Description.toLowerCase().includes(fn.toLowerCase()))
       );
       if (matchingChk && checkpointsData[matchingChk.Id] !== undefined && checkpointsData[matchingChk.Id] !== null) {
