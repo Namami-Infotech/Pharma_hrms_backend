@@ -85,6 +85,13 @@ const editEmployee = async (req, res) => {
       data.Department = data.department;
     }
 
+    if (data.JoinDate === undefined) {
+      const altJd = data.doj || data.DOJ || data.date_of_joining || data.DateOfJoining;
+      if (altJd !== undefined) {
+        data.JoinDate = altJd;
+      }
+    }
+
     const updatableFields = [
       'Name', 'Mobile', 'EmailId', 'Role', 'OTP', 'IsOTPExpired',
       'IsGeofence', 'Tenent_Id', 'IsActive', 'RM', 'Shift',

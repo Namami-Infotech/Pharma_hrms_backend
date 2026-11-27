@@ -42,7 +42,7 @@ const applyLeave = async (req, res) => {
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
-      await ensureCasualLeaveAccrual(empid);
+      await ensureCasualLeaveAccrual(empid, conn);
 
       // Check balance
       let [rows] = await conn.query(

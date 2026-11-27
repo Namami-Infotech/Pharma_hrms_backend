@@ -30,6 +30,9 @@ const listEmployees = async (req, res) => {
         emp.new_role = emp.Role;
         const rLower = String(emp.Role || '').trim().toLowerCase();
         emp.Role = (rLower === 'admin' || rLower === 'superadmin') ? 'Admin' : 'Employee';
+        emp.doj = emp.JoinDate;
+        emp.DOJ = emp.JoinDate;
+        emp.date_of_joining = emp.JoinDate;
       }
 
       // Find the genuinely latest created employee by id DESC

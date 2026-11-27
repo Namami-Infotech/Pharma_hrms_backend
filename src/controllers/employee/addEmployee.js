@@ -20,7 +20,7 @@ const addEmployee = async (req, res) => {
   const CreateDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
   const RM = data.RM || null;
   const ResetTime = data.ResetTime || '06:00:00';
-  const JoinDate = (data.JoinDate && data.JoinDate.toString().trim() !== '') ? data.JoinDate.toString().trim() : null;
+  const JoinDate = (data.JoinDate || data.doj || data.DOJ || data.date_of_joining || data.DateOfJoining || '').toString().trim() || null;
   const DOB = (data.DOB && data.DOB.toString().trim() !== '') ? data.DOB.toString().trim() : null;
   const WeekOff = data.WeekOff || null;
   const Designation = data.Designation || null;
