@@ -25,6 +25,7 @@ const trackRoutes = require('./track');
 const dashboardRoutes = require('./dashboard');
 const menuRoutes = require('./menu');
 const miscRoutes = require('./misc');
+const specialistRoutes = require('./specialist');
 
 // Create modular sub-router for all modules
 const moduleRouter = express.Router();
@@ -53,6 +54,7 @@ moduleRouter.use('/track', trackRoutes);
 moduleRouter.use('/dashboard', dashboardRoutes);
 moduleRouter.use('/menu', menuRoutes);
 moduleRouter.use('/', miscRoutes);
+moduleRouter.use('/specialist', specialistRoutes);
 
 // Mount under /src (file-based matching PHP) and / (clean URL)
 router.use('/', moduleRouter);
